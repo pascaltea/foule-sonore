@@ -441,7 +441,7 @@ export function update(dt) {
     const def = INST[s.inst] || INST.piano;
     swapInst(c, s, now);
     const e = q.energy;
-    c.on = q.on = !s.mute && !quiet && (climax || (c.on ? e > 0.07 : e > 0.12));
+    c.on = q.on = !s.mute && s.present !== false && !quiet && (climax || (c.on ? e > 0.07 : e > 0.12));
     const amt = climax ? Math.max(e, 0.7) : release ? e * 0.6 : e;
     c.level.gain.setTargetAtTime(c.on ? def.level * s.vol * (0.4 + 0.6 * amt) : 0, now, 0.25);
     c.pan.pan.setTargetAtTime(clamp(((s.x + s.w / 2) / GW - 0.5) * 1.7, -0.9, 0.9), now, 0.1);

@@ -3,7 +3,7 @@
 import { GW, GH, GN, state, settings, clamp } from './state.js';
 
 const PW = GW * 2, PH = GH * 2, PN = PW * PH;   // résolution d'analyse 128x72
-const video = document.createElement('video');
+export const video = document.createElement('video');
 video.muted = true; video.playsInline = true;
 const cvs = document.createElement('canvas');
 cvs.width = PW; cvs.height = PH;
@@ -144,8 +144,9 @@ window.addEventListener('pointermove', (e) => {
 });
 
 export function simJump() { jumpT = 0.3; }
+export const simJumping = () => jumpT > 0;
 
-function splat(cx, cy, vx, vy, r) {
+export function splat(cx, cy, vx, vy, r) {
   const F = state.flow, a = clamp(Math.hypot(vx, vy) / 10);
   if (a < 0.01) return;
   const x0 = Math.max(0, Math.floor(cx - r * 2)), x1 = Math.min(GW - 1, Math.ceil(cx + r * 2));
@@ -165,7 +166,8 @@ function simulate(dt, t) {
   const F = state.flow, p = settings.simPreset;
   F.x.fill(0); F.y.fill(0); F.act.fill(0);
   jumpT = Math.max(0, jumpT - dt);
-  for (const d of dancers) {
+  const crowd = settings.mode !== 'group';     // en petit groupe, pose.js anime ses propres silhouettes
+  for (const d of crowd ? dancers : []) {
     let vx = 0, vy = 0;
     if (p === 1) {                                   // calme
       vx = 0.7 * Math.sin(t * 0.7 + d.ph); vy = 0.5 * Math.cos(t * 0.5 + d.ph);
@@ -180,7 +182,7 @@ function simulate(dt, t) {
     if (jumpT > 0) vy -= 30;
     if (p !== 5) splat(d.x + vx * 0.05, d.y + vy * 0.05, vx, vy, 3.2);
   }
-  if (p === 5 && settings.sectors.length) {          // tournée : la foule passe d'un secteur à l'autre toutes les 6 s
+  if (crowd && p === 5 && settings.sectors.length) {          // tournée : la foule passe d'un secteur à l'autre toutes les 6 s
     const S = settings.sectors, s = S[settings.simSector >= 0 ? settings.simSector % S.length : Math.floor(t / 6) % S.length];
     const r = clamp(Math.min(s.w, s.h) / 5, 1.2, 3.2);
     dancers.forEach((d, i) => {

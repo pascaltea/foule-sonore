@@ -1,9 +1,10 @@
 // Régie : panneau de réglages, éditeur de secteurs, raccourcis clavier, jauge, affichage debug.
 import { GW, GH, GN, MAX_SECTORS, SECTOR_COLORS, LAYOUTS, makeLayout, sanitizeSectors, rebuildSectorMap,
-  state, settings, saveSettings, clamp } from './state.js';
+  state, settings, saveSettings, clamp, setMode, configOf, setConfig, sanitizePlayers, playersConfig } from './state.js';
 import { SCALES, KEYS, INSTRUMENTS } from './music.js';
 import { PALETTES } from './visuals.js';
 import * as capture from './capture.js';
+import { slots, BONES, status as poseStatus } from './pose.js';
 
 const $ = (id) => document.getElementById(id);
 let handlers = {}, noteTimer = 0;
@@ -36,8 +37,13 @@ function sync() {
   $('vSens').textContent = settings.sensitivity.toFixed(2);
   $('vVol').textContent = Math.round(settings.volume * 100) + ' %';
   $('vDrama').textContent = '×' + settings.dramaSpeed;
-  $('dbg').checked = settings.debug; $('debug').classList.toggle('on', settings.debug);
+  $('dbgOn').checked = settings.debug; $('debug').classList.toggle('on', settings.debug);
   $('sim').checked = settings.simulate; $('simBox').classList.toggle('on', settings.simulate);
+  const group = settings.mode === 'group';
+  document.body.classList.toggle('group', group);
+  $('mode').value = settings.mode;
+  document.querySelectorAll('[data-mode]').forEach((b) => b.classList.toggle('active', b.dataset.mode === settings.mode));
+  document.querySelectorAll('[data-g]').forEach((b) => { b.dataset.c ??= b.textContent; b.textContent = group ? b.dataset.g : b.dataset.c; });
   $('showSec').checked = settings.showSectors; $('sectors').classList.toggle('on', settings.showSectors);
   document.querySelectorAll('[data-p]').forEach((b) => b.classList.toggle('active', +b.dataset.p === settings.simPreset));
   document.body.classList.toggle('clean', $('panel').classList.contains('hidden') && !settings.simulate && $('start').classList.contains('hidden'));
@@ -75,7 +81,7 @@ function onSectorInput(e) {
   const i = +row.dataset.i, s = settings.sectors[i];
   if (!s) return;
   if (f === 'del') {
-    if (e.type !== 'click') return;
+    if (e.type !== 'click' || settings.mode === 'group') return;
     settings.sectors.splice(i, 1); sel = -1; sectorsChanged(); return;
   }
   if (e.type === 'click') { if (sel !== i) { sel = i; document.querySelectorAll('.sec').forEach((r, k) => r.classList.toggle('sel', k === i)); } return; }
@@ -92,6 +98,7 @@ function cellAt(e) {
   return [(e.clientX - r.left - OX) / CELL, (e.clientY - r.top - OY) / CELL];
 }
 function editorDown(e) {
+  if (settings.mode === 'group') return;        // en petit groupe, les rectangles suivent les personnes
   const [gx, gy] = cellAt(e), S = settings.sectors, M = 1.3;
   if (gx < -1 || gy < -1 || gx > GW + 1 || gy > GH + 1) return;
   let hit = -1;
@@ -135,14 +142,14 @@ function editorUp() {
   sectorsChanged();
 }
 function deleteSelected() {
-  if (sel < 0 || !settings.sectors[sel]) return;
+  if (sel < 0 || !settings.sectors[sel] || settings.mode === 'group') return;
   settings.sectors.splice(sel, 1); sel = -1; sectorsChanged();
 }
 
 // ---------- Export / import de la configuration ----------
 const CFG_KEYS = ['sensitivity', 'scale', 'key', 'volume', 'palette', 'dramaSpeed', 'showSectors'];
 function exportConfig() {
-  const cfg = { type: 'foule-sonore', version: 2, sectors: settings.sectors };
+  const cfg = { type: 'foule-sonore', version: 3, sectors: configOf('crowd'), players: playersConfig() };
   CFG_KEYS.forEach((k) => { cfg[k] = settings[k]; });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([JSON.stringify(cfg, null, 2)], { type: 'application/json' }));
@@ -151,8 +158,9 @@ function exportConfig() {
 }
 export function applyConfig(cfg) {
   if (!cfg || typeof cfg !== 'object' || !Array.isArray(cfg.sectors)) throw new Error('format');
-  settings.sectors = sanitizeSectors(cfg.sectors);
-  settings.sectors.forEach((s) => { if (!INSTRUMENTS[s.inst]) s.inst = 'piano'; });
+  setConfig('crowd', sanitizeSectors(cfg.sectors));
+  if (Array.isArray(cfg.players)) setConfig('group', sanitizePlayers(cfg.players));
+  [...configOf('crowd'), ...configOf('group')].forEach((s) => { if (!INSTRUMENTS[s.inst]) s.inst = 'piano'; });
   if (SCALES[cfg.scale]) settings.scale = cfg.scale;
   if (PALETTES[cfg.palette]) settings.palette = cfg.palette;
   if (cfg.key >= 0 && cfg.key < 12) settings.key = cfg.key | 0;
@@ -174,6 +182,12 @@ async function importConfig(e) {
   catch { note('Fichier de configuration illisible.', 5000); }
 }
 
+export function changeMode(mode) {
+  if (mode !== 'group' && mode !== 'crowd') return;
+  setMode(mode); sel = -1; drag = null;
+  sectorsChanged(); sync();
+  handlers.onMode?.(mode);
+}
 export function setSim(v) { settings.simulate = v; handlers.onSim?.(v); sync(); }
 function fullscreen() {
   if (document.fullscreenElement) document.exitFullscreen();
@@ -195,8 +209,10 @@ export function init(h) {
   $('scale').onchange = (e) => { settings.scale = e.target.value; sync(); };
   $('key').onchange = (e) => { settings.key = +e.target.value; sync(); };
   $('palette').onchange = (e) => { settings.palette = e.target.value; sync(); };
+  $('mode').onchange = (e) => changeMode(e.target.value);
+  document.querySelectorAll('[data-mode]').forEach((b) => { b.onclick = () => changeMode(b.dataset.mode); });
   $('camera').onchange = (e) => { settings.cameraId = e.target.value; sync(); h.onCamera?.(); };
-  $('dbg').onchange = (e) => { settings.debug = e.target.checked; sync(); };
+  $('dbgOn').onchange = (e) => { settings.debug = e.target.checked; sync(); };
   $('sim').onchange = (e) => setSim(e.target.checked);
   $('showSec').onchange = (e) => { settings.showSectors = e.target.checked; sync(); };
   $('layout').onchange = (e) => { if (e.target.value) { settings.sectors = makeLayout(e.target.value, settings.sectors); sel = -1; sectorsChanged(); } };
@@ -254,6 +270,7 @@ function drawDebug() {
   // Secteurs : contour, nom, instrument ; le secteur sélectionné est en trait épais.
   g.font = '11px ui-monospace, Menlo, monospace';
   secs.forEach((s, i) => {
+    if (s.present === false) return;
     const q = state.sec[i], x = ox + s.x * S, y = oy + s.y * S, w = s.w * S, h = s.h * S;
     g.globalAlpha = 0.06 + 0.2 * q.pulse; g.fillStyle = s.color; g.fillRect(x, y, w, h);
     g.globalAlpha = q.on ? 1 : 0.55; g.strokeStyle = s.color; g.lineWidth = i === sel ? 2.5 : 1;
@@ -261,6 +278,19 @@ function drawDebug() {
     g.fillText(`${s.name} · ${INSTRUMENTS[s.inst] || ''}`.slice(0, Math.max(3, (w / 6.7) | 0)), x + 4, y + 13);
     g.globalAlpha = 1;
   });
+  if (settings.mode === 'group') {          // silhouettes suivies (traits seulement, jamais l'image)
+    g.lineWidth = 2;
+    slots.forEach((p, i) => {
+      if (!p.on || !secs[i]) return;
+      g.strokeStyle = secs[i].color; g.beginPath();
+      for (const [a, b] of BONES) {
+        if (p.vis[a] < 0.3 || p.vis[b] < 0.3) continue;
+        g.moveTo(ox + p.px[a] * W, oy + p.py[a] * GH * S); g.lineTo(ox + p.px[b] * W, oy + p.py[b] * GH * S);
+      }
+      g.stroke();
+      g.beginPath(); g.arc(ox + p.px[0] * W, oy + p.py[0] * GH * S, 5, 0, 6.283); g.stroke();
+    });
+  }
   g.lineWidth = 1;
   g.strokeStyle = '#fff'; g.beginPath(); g.arc(ox + m.cx * W, oy + m.cy * GH * S, 5, 0, 6.283); g.stroke();
   // Énergie par secteur.
@@ -289,7 +319,7 @@ function drawDebug() {
   g.fillStyle = '#8dff7a'; g.fillText(`cohérence ${pc(m.coherence)}`, ox + 190, ty);
   g.fillStyle = '#fff'; g.fillText(`jauge ${pc(d.gauge)}`, ox + 300, ty);
   line(1, '#ddd', `tempo ${mu.bpm.toFixed(0)} BPM   pulsation foule ${m.pulseConf > 0.5 ? m.pulseBpm.toFixed(0) + ' BPM' : '—'} (${pc(m.pulseConf)})`);
-  line(2, '#ddd', `palier ${d.tier} · ${d.phase}${d.attract ? ' · attraction' : ''}   secteurs ${secs.map((_, i) => +state.sec[i].on).join('')}`);
+  line(2, '#ddd', `palier ${d.tier} · ${d.phase}${d.attract ? ' · attraction' : ''}   ${settings.mode === 'group' ? `personnes ${slots.filter((p) => p.on).length} · suivi ${settings.simulate ? 'simulé' : poseStatus.ready ? 'actif' : poseStatus.loading ? 'chargement' : 'absent'}` : 'secteurs'} ${secs.map((_, i) => +state.sec[i].on).join('')}`);
   line(3, '#999', `${state.perf.fps.toFixed(0)} i/s · qualité ${state.perf.quality} · ${settings.simulate ? 'simulation' : state.capture.mode}   niveau ${mu.level.toFixed(3)}`);
 }
 
@@ -303,7 +333,15 @@ export function update() {
   if (c.calibLeft > 0) note(`Calibration… ${Math.ceil(c.calibLeft)} s`, 800);
   if (settings.showSectors) {            // le contour d'un secteur s'allume quand son instrument joue
     const el = $('sectors').children;
-    for (let i = 0; i < el.length; i++) { const q = state.sec[i]; el[i].style.opacity = (q.on ? 0.45 : 0.2) + 0.5 * q.pulse; }
+    for (let i = 0; i < el.length; i++) {
+      const q = state.sec[i], s = settings.sectors[i];
+      el[i].style.opacity = (q.on ? 0.45 : 0.2) + 0.5 * q.pulse;
+      if (settings.mode === 'group' && s) {          // le cadre suit la personne
+        el[i].style.display = s.present ? '' : 'none';
+        el[i].style.left = s.x / GW * 100 + '%'; el[i].style.top = s.y / GH * 100 + '%';
+        el[i].style.width = s.w / GW * 100 + '%'; el[i].style.height = s.h / GH * 100 + '%';
+      }
+    }
   }
   if (settings.debug) drawDebug();
 }

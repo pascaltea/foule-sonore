@@ -2,7 +2,14 @@
 
 Installation interactive : le mouvement d'une foule, filmée par une webcam, devient musique et lumière en temps réel.
 
-Tout tourne dans le navigateur (Chrome recommandé), sans serveur ni dépendance. La caméra sert uniquement à mesurer le mouvement : aucune image n'est affichée, enregistrée ni envoyée.
+Tout tourne dans le navigateur (Chrome recommandé), sans serveur. La caméra sert uniquement à mesurer le mouvement : aucune image n'est affichée, enregistrée ni envoyée.
+
+## Deux modes
+
+- **Foule** : l'espace est découpé en secteurs fixes, chaque secteur joue son instrument. Aucune dépendance.
+- **Petit groupe** (1 à 5 personnes) : chaque personne est suivie et devient un instrument, qui la suit dans ses déplacements. Bouger joue, lever les mains monte dans l'aigu, des gestes rapides accélèrent le rythme, sauter donne un accent. Ce mode charge la bibliothèque MediaPipe Pose depuis Internet au premier lancement ; l'analyse se fait ensuite sur l'ordinateur.
+
+Le mode se choisit sur l'écran de démarrage ou dans la régie.
 
 ## Principe
 

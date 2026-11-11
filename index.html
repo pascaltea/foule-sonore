@@ -83,6 +83,12 @@
   #start button { width: auto; padding: 14px 30px; font-size: 17px; border-radius: 99px; }
   #btnStart { background: var(--accent); color: #1a0d00; border-color: transparent; font-weight: 600; }
   #btnStart:hover { background: #ffb45c; }
+  #modes { display: inline-flex; gap: 6px; margin: 0 0 22px; padding: 5px; border-radius: 99px; border: 1px solid var(--line); }
+  #modes button { padding: 9px 22px; font-size: 15px; background: none; border-color: transparent; color: var(--dim); }
+  #modes button.active { background: rgba(255,255,255,.14); color: var(--ink); }
+  body.group .crowdOnly { display: none !important; }
+  body:not(.group) .groupOnly { display: none !important; }
+  body.group .sec [data-f=del] { display: none; }
   #start .alt { display: block; margin: 14px auto 0; background: none; border-color: var(--line); font-size: 14px; padding: 9px 20px; }
 </style>
 </head>
@@ -96,6 +102,8 @@
 
 <aside id="panel" class="hidden">
   <h2>Régie</h2>
+  <label>Mode</label>
+  <select id="mode"><option value="crowd">Foule (secteurs de l'espace)</option><option value="group">Petit groupe (1 à 5 personnes suivies)</option></select>
   <label>Caméra</label>
   <select id="camera"></select>
   <div class="row">
@@ -114,23 +122,25 @@
   <select id="palette"></select>
   <label>Vitesse de la jauge collective <span id="vDrama"></span></label>
   <input id="drama" type="range" min="0.25" max="6" step="0.25">
-  <label class="check"><input id="dbg" type="checkbox"> Affichage debug</label>
+  <label class="check"><input id="dbgOn" type="checkbox"> Affichage debug</label>
   <label class="check"><input id="sim" type="checkbox"> Mode simulation</label>
   <div id="simBox">
     <div class="row" id="presets">
-      <button data-p="0">Souris</button><button data-p="1">Calme</button><button data-p="2">Dispersée</button>
+      <button data-p="0">Souris</button><button data-p="1" data-g="Solo">Calme</button><button data-p="2" data-g="Duo">Dispersée</button>
     </div>
     <div class="row">
-      <button data-p="3">Synchro</button><button data-p="4">Frénésie</button><button data-p="5" title="La foule passe d'un secteur à l'autre">Tournée</button>
+      <button data-p="3" data-g="Trio">Synchro</button><button data-p="4" data-g="À cinq">Frénésie</button><button data-p="5" title="Chacun son tour">Tournée</button>
     </div>
     <div class="row"><button id="jump">Saut collectif</button></div>
   </div>
-  <h3>Secteurs et instruments</h3>
-  <label>Découpage</label>
-  <select id="layout"></select>
+  <h3 class="crowdOnly">Secteurs et instruments</h3>
+  <h3 class="groupOnly">Personnes et instruments</h3>
+  <label class="crowdOnly">Découpage</label>
+  <select id="layout" class="crowdOnly"></select>
   <div id="secList"></div>
-  <p class="hint">Sur la grille debug (<kbd>D</kbd>) : glisser dans le vide pour créer un secteur, glisser un secteur pour le déplacer, ses bords pour le redimensionner, <kbd>Suppr</kbd> pour l'effacer. 6 secteurs au plus.</p>
-  <label class="check"><input id="showSec" type="checkbox"> Afficher les secteurs au public</label>
+  <p class="hint groupOnly">Chaque personne détectée reçoit un instrument, dans l'ordre d'arrivée, et le garde tant qu'elle reste dans le champ. Bouger joue, lever les mains monte dans l'aigu, des gestes rapides accélèrent le rythme, sauter donne un accent.</p>
+  <p class="hint crowdOnly">Sur la grille debug (<kbd>D</kbd>) : glisser dans le vide pour créer un secteur, glisser un secteur pour le déplacer, ses bords pour le redimensionner, <kbd>Suppr</kbd> pour l'effacer. 6 secteurs au plus.</p>
+  <label class="check"><input id="showSec" type="checkbox"> <span class="crowdOnly" style="float:none">Afficher les secteurs au public</span><span class="groupOnly" style="float:none">Afficher le cadre de chaque personne</span></label>
   <div class="row">
     <button id="exportCfg">Exporter</button><button id="importCfg">Importer</button>
     <input id="importFile" type="file" accept="application/json,.json" hidden>
@@ -142,7 +152,9 @@
 <div id="start">
   <div>
     <h1>Foule Sonore</h1>
-    <p>Le mouvement de la foule devient musique et lumière. La caméra sert uniquement à mesurer le mouvement : aucune image n'est affichée, enregistrée ni envoyée.</p>
+    <div id="modes"><button data-mode="crowd">Foule</button><button data-mode="group">Petit groupe</button></div>
+    <p class="crowdOnly">Le mouvement de la foule devient musique et lumière. La caméra sert uniquement à mesurer le mouvement : aucune image n'est affichée, enregistrée ni envoyée.</p>
+    <p class="groupOnly">De 1 à 5 personnes : chacune devient un instrument, joué avec tout le corps. La caméra sert uniquement à suivre les gestes : aucune image n'est affichée, enregistrée ni envoyée.</p>
     <button id="btnStart">Démarrer avec la caméra</button>
     <button id="btnSim" class="alt">Tester sans caméra (simulation)</button>
   </div>

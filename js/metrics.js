@@ -47,7 +47,8 @@ export function updateMetrics(dt) {
     m.dispersion = smooth(m.dispersion, clamp(Math.sqrt(disp / sa) * 2.5), dt, 0.6);
   }
   // Mêmes métriques par secteur, normalisées par sa surface.
-  for (let z = 0; z < NS; z++) {
+  const group = settings.mode === 'group';     // en petit groupe, pose.js renseigne lui-même chaque personne
+  for (let z = 0; z < NS && !group; z++) {
     const q = state.sec[z], s = settings.sectors[z], area = state.secArea[z];
     const e = s && area ? clamp(za[z] / area * 4.5) : 0;
     const act = za[z] > Math.max(0.4, area * 0.004) && zm[z] > 1e-3;
@@ -58,6 +59,15 @@ export function updateMetrics(dt) {
     q.eFast = smooth(q.eFast, e, dt, 0.1); q.eSlow = smooth(q.eSlow, e, dt, 1.5);
     q.peakAge += dt;
     if (q.eFast - q.eSlow > 0.22 && q.peakAge > 1.5) { q.peakCount++; q.peakAge = 0; }
+  }
+
+  if (group) {
+    // À échelle humaine, « bouger ensemble » = que toutes les personnes présentes jouent en même temps.
+    let n = 0, se = 0, on = 0;
+    settings.sectors.forEach((s, i) => { if (s.present) { n++; se += state.sec[i].energy; if (state.sec[i].energy > 0.12) on++; } });
+    const ge = n ? se / n : 0;
+    m.energy = Math.max(m.energy, ge);
+    m.coherence = smooth(m.coherence, n && ge > 0.06 ? clamp(0.3 + 0.7 * on / n) : 0, dt, 0.7, 1.4);
   }
 
   // Événements : pic soudain et immobilité.

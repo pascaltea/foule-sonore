@@ -1,6 +1,7 @@
 // Boucle principale : captation -> métriques -> dramaturgie -> musique -> visuels.
 import { state, settings } from './state.js';
 import * as capture from './capture.js';
+import * as pose from './pose.js';
 import { updateMetrics, updateDrama } from './metrics.js';
 import * as music from './music.js';
 import * as visuals from './visuals.js';
@@ -26,14 +27,24 @@ async function useCamera() {
   await ui.refreshCameras();
 }
 
+// Petit groupe avec caméra : le suivi du corps est chargé à la demande.
+async function usePose() {
+  if (settings.mode !== 'group' || settings.simulate || pose.status.ready) return;
+  ui.note('Chargement du suivi du corps…', 0);
+  try { await pose.load(); ui.note('Suivi du corps prêt : placez-vous face à la caméra, corps entier visible.', 6000); }
+  catch { ui.note(pose.status.error + ' : essayez la simulation ou le mode Foule.', 10000); }
+}
+
 ui.init({
   async onStart(withCamera) {
     try { await music.init(); } catch (e) { ui.note('Audio indisponible dans ce navigateur.', 8000); }
     if (withCamera) await useCamera(); else ui.setSim(true);
     ui.started();
+    usePose();
   },
-  onCamera: useCamera,
-  onSim(v) { if (!v && state.capture.mode !== 'camera' && state.music.running) useCamera(); },
+  async onCamera() { await useCamera(); usePose(); },
+  onMode() { if (state.music.running) usePose(); },
+  onSim(v) { if (!v && state.music.running) { if (state.capture.mode !== 'camera') useCamera().then(usePose); else usePose(); } },
 });
 ui.refreshCameras();
 
@@ -48,6 +59,7 @@ function adaptQuality(rawDt) {
 
 function pipeline(dt, t) {
   capture.update(dt, t);
+  pose.update(dt);
   updateMetrics(dt);
   updateDrama(dt);
   music.update(dt);
@@ -67,6 +79,6 @@ requestAnimationFrame(frame);
 // Accès console pour le réglage sur site et les auto-tests.
 let vt = 0;
 window.__foule = {
-  state, settings, audio: music.debugInfo, offline: music.offlineTest,
+  state, settings, pose, audio: music.debugInfo, offline: music.offlineTest,
   run(seconds) { for (let i = 0; i < seconds * 60; i++) { vt += 1 / 60; pipeline(1 / 60, vt); } },   // avance en temps virtuel
 };

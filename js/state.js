@@ -43,7 +43,22 @@ const KEY = 'foule-sonore';
 let saved = {};
 try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { /* stockage indisponible */ }
 
+// Mode « petit groupe » : une personne suivie = un instrument. Le rectangle suit la personne à chaque image.
+export const MAX_PLAYERS = 5;
+export function sanitizePlayers(arr) {
+  return Array.from({ length: MAX_PLAYERS }, (_, i) => {
+    const s = (Array.isArray(arr) && arr[i]) || {};
+    return {
+      name: String(s.name ?? 'Personne ' + (i + 1)).slice(0, 24),
+      color: /^#[0-9a-f]{6}$/i.test(s.color) ? s.color : SECTOR_COLORS[i],
+      inst: String(s.inst || ['piano', 'drums', 'violin', 'marimba', 'bass'][i]), vol: clamp(+s.vol >= 0 ? +s.vol : 1, 0, 1.5), mute: !!s.mute,
+      x: 0, y: 0, w: 0, h: 0, present: false,
+    };
+  });
+}
+
 export const settings = Object.assign({
+  mode: 'crowd',      // 'crowd' (foule, secteurs fixes) ou 'group' (1 à 5 personnes suivies)
   cameraId: '',
   sensitivity: 1.3,   // foule large et lointaine : gain un peu relevé par défaut
   scale: 'pentaMin',
@@ -54,10 +69,26 @@ export const settings = Object.assign({
   dramaSpeed: 1,
   showSectors: false,
 }, saved, { simulate: false, simPreset: 2, simSector: -1 });
-settings.sectors = sanitizeSectors(saved.sectors);
+if (settings.mode !== 'group') settings.mode = 'crowd';
+// settings.sectors désigne toujours la configuration du mode actif ; celle de l'autre mode attend dans « stash ».
+let stash = settings.mode === 'group' ? sanitizeSectors(saved.sectors) : sanitizePlayers(saved.players);
+settings.sectors = settings.mode === 'group' ? sanitizePlayers(saved.players) : sanitizeSectors(saved.sectors);
+delete settings.players;
+
+export const configOf = (mode) => (mode === settings.mode ? settings.sectors : stash);
+export function setConfig(mode, arr) { if (mode === settings.mode) settings.sectors = arr; else stash = arr; }
+export function setMode(mode) {
+  if (mode === settings.mode) return;
+  const cur = settings.sectors;
+  settings.sectors = stash; stash = cur; settings.mode = mode;
+  state.sec.forEach((q) => Object.assign(q, newSec(), { peakCount: q.peakCount }));
+  rebuildSectorMap();
+}
+export const playersConfig = () => configOf('group').map(({ name, color, inst, vol, mute }) => ({ name, color, inst, vol, mute }));
 
 export function saveSettings() {
-  const { simulate, simPreset, simSector, ...keep } = settings;
+  const { simulate, simPreset, simSector, sectors, ...keep } = settings;
+  keep.sectors = configOf('crowd'); keep.players = playersConfig();
   try { localStorage.setItem(KEY, JSON.stringify(keep)); } catch { /* ignoré */ }
 }
 
