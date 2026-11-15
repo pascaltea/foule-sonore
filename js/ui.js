@@ -225,7 +225,12 @@ export function init(h) {
   $('full').onclick = fullscreen;
   $('jump').onclick = () => capture.simJump();
   document.querySelectorAll('[data-p]').forEach((b) => { b.onclick = () => { settings.simPreset = +b.dataset.p; sync(); }; });
-  $('btnStart').onclick = () => h.onStart(true);
+  $('btnStart').onclick = async (e) => {
+    const b = e.currentTarget;
+    if (b.disabled) return;
+    b.disabled = true; $('camErr').hidden = true;
+    try { await h.onStart(true); } finally { b.disabled = false; }
+  };
   $('btnSim').onclick = () => h.onStart(false);
 
   const dbg = $('debug');
@@ -249,6 +254,12 @@ export function init(h) {
   });
   sectorsChanged();
   sync();
+}
+
+export function startError(msg) {
+  const p = $('camErr');
+  p.textContent = msg + '.'; p.hidden = false;
+  $('btnStart').textContent = 'Réessayer avec la caméra';
 }
 
 export function started() { $('start').classList.add('hidden'); $('panel').classList.remove('hidden'); sync(); }

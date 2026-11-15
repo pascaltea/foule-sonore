@@ -25,12 +25,30 @@ export function stopCamera() {
   if (state.capture.mode === 'camera') state.capture.mode = 'off';
 }
 
+// Messages lisibles pour les erreurs de getUserMedia.
+const DENIED = "Accès à la caméra refusé. Cliquez sur l'icône à gauche de l'adresse, autorisez la caméra puis rechargez la page"
+  + ' (sur Mac, vérifiez aussi Réglages Système › Confidentialité et sécurité › Caméra pour Chrome)';
+const CAMERA_ERRORS = {
+  NotAllowedError: DENIED,
+  SecurityError: DENIED,
+  PermissionDeniedError: DENIED,
+  NotReadableError: 'Caméra déjà utilisée par une autre application (Zoom, Teams, FaceTime, autre onglet…) : fermez-la puis réessayez',
+  TrackStartError: 'Caméra déjà utilisée par une autre application : fermez-la puis réessayez',
+  AbortError: 'La caméra a refusé de démarrer : fermez les autres applications vidéo ou rebranchez-la',
+  NotFoundError: 'Aucune caméra détectée : branchez une webcam puis réessayez',
+  DevicesNotFoundError: 'Aucune caméra détectée : branchez une webcam puis réessayez',
+  OverconstrainedError: 'La caméra choisie ne répond pas : choisissez-en une autre dans la régie',
+};
+
 export async function startCamera(deviceId) {
   stopCamera();
   state.capture.error = '';
+  const fail = (msg, e) => { state.capture.error = msg; stopCamera(); throw e || new Error(msg); };
+  if (!window.isSecureContext) fail("La caméra n'est accessible que depuis une adresse https:// ou http://localhost");
   if (!navigator.mediaDevices?.getUserMedia) {
-    state.capture.error = 'Caméra non disponible dans ce navigateur';
-    throw new Error(state.capture.error);
+    fail(window.self !== window.top
+      ? 'La caméra est bloquée dans cette page intégrée : ouvrez le site directement dans Chrome'
+      : 'Caméra non disponible dans ce navigateur (utilisez Chrome)');
   }
   try {
     stream = await navigator.mediaDevices.getUserMedia({
@@ -41,11 +59,10 @@ export async function startCamera(deviceId) {
       },
     });
   } catch (e) {
-    state.capture.error = e.name === 'NotAllowedError' ? 'Accès à la caméra refusé' : 'Caméra introuvable';
-    throw e;
+    fail(CAMERA_ERRORS[e.name] || `Caméra inaccessible (${e.name || e.message})`, e);
   }
   video.srcObject = stream;
-  await video.play();
+  try { await video.play(); } catch (e) { fail('Le flux de la caméra ne démarre pas', e); }
   state.capture.mode = 'camera';
   recalibrate();
 }

@@ -89,6 +89,8 @@
   body.group .crowdOnly { display: none !important; }
   body:not(.group) .groupOnly { display: none !important; }
   body.group .sec [data-f=del] { display: none; }
+  #start #camErr { color: #ffb4a8; background: rgba(255,80,60,.12); border: 1px solid rgba(255,80,60,.4); border-radius: 10px; padding: 10px 14px; margin: 0 auto 18px; font-size: 15px; }
+  #btnStart:disabled { opacity: .6; cursor: wait; }
   #start .alt { display: block; margin: 14px auto 0; background: none; border-color: var(--line); font-size: 14px; padding: 9px 20px; }
 </style>
 </head>
@@ -155,6 +157,7 @@
     <div id="modes"><button data-mode="crowd">Foule</button><button data-mode="group">Petit groupe</button></div>
     <p class="crowdOnly">Le mouvement de la foule devient musique et lumière. La caméra sert uniquement à mesurer le mouvement : aucune image n'est affichée, enregistrée ni envoyée.</p>
     <p class="groupOnly">De 1 à 5 personnes : chacune devient un instrument, joué avec tout le corps. La caméra sert uniquement à suivre les gestes : aucune image n'est affichée, enregistrée ni envoyée.</p>
+    <p id="camErr" role="alert" hidden></p>
     <button id="btnStart">Démarrer avec la caméra</button>
     <button id="btnSim" class="alt">Tester sans caméra (simulation)</button>
   </div>
