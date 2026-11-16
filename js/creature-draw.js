@@ -99,46 +99,51 @@ export function auraBreath(f, t) {
   const hold = f.aHush > 0 ? 1 - 0.85 * Math.max(0, Math.sin(t * 6.2832 / (13 - 2 * f.aHush))) ** 10 : 1;
   return pulse * hold;
 }
-// L'aura dit quelque chose de la créature. Elle bat (ils ont tenu ensemble) ou elle erre (ils ont cherché) ; elle
-// l'enveloppe d'un seul halo (ils se sont fait de la place) ou monte en colonnes séparées (chacun sa voix) ; elle
-// s'ouvre large aux couleurs des pays (ils sont allés vers l'autre) ; elle retient son souffle (leurs silences),
-// lance des ondes vertes (chaque débordement) et des étincelles (leurs sauts).
-export function drawAura(c, w, ground, cx, cy, R, colors, t, strength = 1, f = PLAIN) {
+// L'aura dit quelque chose de la créature, dans la matière de l'univers : un halo discret et une brume de grain fin,
+// jamais de rideaux de couleur. La brume bat (ils ont tenu ensemble) ou erre (ils ont cherché) ; elle reste contre elle
+// (ils se sont fait de la place) ou file haut en mèches séparées (chacun sa voix) ; elle s'ouvre large (ils sont allés
+// vers l'autre) ; elle retient son souffle (leurs silences), une onde de grain part d'elle pour chaque débordement,
+// des étincelles bondissent (leurs sauts).
+export function drawAura(c, w, ground, cx, cy, R, colors, t, strength = 1, f = PLAIN, grains = 1500) {
   c.save(); c.globalCompositeOperation = 'lighter';
-  const cols = [...colors, GREEN], n = cols.length, tt = t * f.aSpeed, wrap = f.aWrap, reach = 0.55 + 0.9 * f.aReach, stray = 1 - f.aPulse;
-  const k0 = strength * auraBreath(f, t);
-  const blob = (x, y, rx, ry, col, a) => {
-    if (a <= 0.004) return;
-    c.save(); c.translate(x, y); c.scale(rx, ry);
-    const gd = c.createRadialGradient(0, 0, 0, 0, 0, 1);
-    gd.addColorStop(0, css(col, a)); gd.addColorStop(0.5, css(col, a * 0.35)); gd.addColorStop(1, css(col, 0));
-    c.fillStyle = gd; c.fillRect(-1, -1, 2, Math.min(2, 1 + (ground - y) / ry)); c.restore();
-  };
-  // Le halo : serré autour d'elle, ou des foyers qui se tiennent à distance les uns des autres.
+  const cols = [...colors, GREEN], n = cols.length, tt = t * f.aSpeed, wrap = f.aWrap, stray = 1 - f.aPulse, breath = auraBreath(f, t), k0 = strength * (0.75 + 0.25 * breath);
+  // Le halo, doux et rond, qui tourne lentement autour d'elle.
   for (let k = 0; k < n; k++) {
-    const a = tt * (0.11 + 0.023 * k) * (k % 2 ? -1 : 1) + k * 2.4, d = R * (0.3 + 0.25 * Math.sin(tt * 0.17 + k * 1.3));
-    const xo = cx + d * Math.cos(a) * 1.25, yo = cy - R * 0.55 + d * Math.sin(a) * 0.6;
-    const xs = cx + R * 1.5 * reach * ((k + 0.5) / n - 0.5) * 2 + R * 0.3 * stray * Math.sin(tt * 0.31 + k * 5), ys = cy - R * (1 + 0.2 * Math.sin(tt * 0.2 + k * 2));
-    const x = xs + (xo - xs) * wrap, y = ys + (yo - ys) * wrap, rad = R * (0.75 + 0.35 * reach + 0.25 * Math.sin(tt * 0.23 + k * 2));
-    blob(x, y, rad * (0.55 + 0.45 * wrap), rad * (1.5 - 0.5 * wrap), cols[k], 0.2 * k0);
+    const a = tt * (0.11 + 0.023 * k) * (k % 2 ? -1 : 1) + k * 2.4, d = R * (0.35 + 0.3 * Math.sin(tt * 0.17 + k * 1.3)) * (1.25 - 0.45 * wrap);
+    const x = cx + d * Math.cos(a) * 1.25, y = cy - R * 0.55 + d * Math.sin(a) * 0.6, rad = R * (1.05 + 0.3 * Math.sin(tt * 0.23 + k * 2));
+    const gd = c.createRadialGradient(x, y, 0, x, y, rad);
+    gd.addColorStop(0, css(cols[k], 0.17 * k0)); gd.addColorStop(0.5, css(cols[k], 0.06 * k0)); gd.addColorStop(1, css(cols[k], 0));
+    c.fillStyle = gd; c.fillRect(0, 0, w, ground);
   }
-  // La brume qui monte : droite quand le battement a tenu, vagabonde quand ils ont cherché ; ses courants se croisent s'ils ont échangé leurs places.
-  const M = 7;
-  for (let k = 0; k < M; k++) {
-    const p = (tt * (0.05 + 0.006 * (k % 3)) + k * 0.381) % 1, side = ((k * 0.618) % 1 - 0.5) * 2, life = Math.sin(3.1416 * p);
-    const x = cx + R * 1.7 * reach * side * (1 - f.aCross * 1.6 * p) + R * 0.35 * stray * Math.sin(tt * 0.5 + k * 3 + p * 5);
-    blob(x, ground - R * (0.3 + 2.3 * p), R * (0.2 + 0.16 * p), R * (0.75 + 0.5 * p), cols[k % n], 0.13 * k0 * life);
+  // La brume de grain : des mèches fines qui montent de son dos.
+  let sd = 29;
+  const rnd = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; };
+  const px = Math.max(1, R / 260), rise = R * (0.7 + 1.5 * (1 - 0.6 * wrap)), open = R * (0.15 + 1.1 * f.aReach), g = strength * breath;
+  for (let i = 0; i < grains; i++) {
+    const u = rnd(), sp = 0.035 + 0.05 * rnd(), ph = rnd(), jit = rnd(), bright = rnd(), tint = rnd(), sz = rnd();
+    const p = (tt * sp + ph) % 1, th = Math.PI * (1.04 + 0.92 * u), cs = Math.cos(th);
+    // les mèches : des bandes qui glissent lentement le long du dos, nettes si le battement a tenu
+    const lock = (0.5 + 0.5 * Math.sin(u * (16 + 10 * (1 - wrap)) + tt * 0.22 + 1.5 * stray * Math.sin(tt * 0.4 + p * 4))) ** (1.5 + 2 * f.aPulse);
+    const al = Math.sin(Math.PI * p) ** 0.7 * (0.12 + 0.88 * lock) * (0.25 + 0.75 * bright) * 0.55 * g;
+    if (al < 0.02) continue;
+    const x = cx + R * f.sx * cs * (1 + 0.1 * jit) + open * p * cs * (1 - 2.2 * f.aCross * p)
+      + R * 0.16 * stray * p * Math.sin(tt * 0.7 + u * 9 + p * 5) + R * 0.1 * wrap * Math.sin(p * 5 + u * 20 + tt * 0.3);
+    const y = cy + R * f.sy * Math.sin(th) * (1 + 0.1 * jit) - rise * p * (0.5 + 0.5 * jit);
+    if (y > ground) continue;
+    const col = tint < 0.22 ? cols[(i % n)] : null, s = px * (0.8 + 1.3 * sz);
+    c.fillStyle = col ? css([0.5 * col[0] + 0.3, 0.5 * col[1] + 0.4, 0.5 * col[2] + 0.35], al) : `rgba(${(70 + 110 * tint) | 0},225,${(150 + 60 * tint) | 0},${al})`;
+    c.fillRect(x, y, s, s);
   }
-  // Une onde par débordement : Genève qui déborde encore.
+  // Une onde de grain par débordement : Genève qui déborde encore.
   if (f.aWaves >= 0.5) {
-    const every = 15 / Math.min(6, f.aWaves) + 1.5, p = (t % every) / 2.6;
+    const every = 15 / Math.min(6, f.aWaves) + 1.5, p = (t % every) / 3;
     if (p < 1) {
-      // Un souffle, pas un trait : un anneau fondu qui s'élargit en s'effaçant.
-      const rr = 1 + 1.5 * p, wd = 0.12 + 0.45 * p, out = rr + wd, al = 0.22 * strength * (1 - p) ** 1.5;
-      c.save(); c.translate(cx, cy); c.scale(R * f.sx, R * f.sy);
-      const gd = c.createRadialGradient(0, 0, Math.max(0, rr - wd), 0, 0, out);
-      gd.addColorStop(0, css(GREEN, 0)); gd.addColorStop(0.5, css(GREEN, al)); gd.addColorStop(1, css(GREEN, 0));
-      c.fillStyle = gd; c.fillRect(-out, -out, 2 * out, out + (ground - cy) / (R * f.sy)); c.restore();
+      const m = Math.min(900, grains * 0.6), rr = 1 + 1.4 * p ** 0.7, fade = (1 - p) ** 1.3 * strength;
+      for (let i = 0; i < m; i++) {
+        const th = Math.PI * (1 + rnd()), off = (rnd() + rnd() - 1) * (0.05 + 0.22 * p), a = fade * (0.3 + 0.6 * rnd()) * (1 - Math.abs(off) / (0.05 + 0.22 * p)), s = px * (0.8 + 1.2 * rnd());
+        c.fillStyle = `rgba(90,235,170,${a})`;
+        c.fillRect(cx + R * f.sx * (rr + off) * Math.cos(th), cy + R * f.sy * (rr + off) * Math.sin(th), s, s);
+      }
     }
   }
   // Leurs sauts : des étincelles qui bondissent de son dos.
@@ -248,7 +253,7 @@ export class Living {
     const c = el.getContext('2d'), tt = t + this.phase, f = this.f, R = this.R, cx = w / 2, cy = h + R * f.sy * 0.08;
     this.gaze.step(dt);
     c.clearRect(0, 0, w, h);
-    drawAura(c, w, h, cx, cy, R, this.colors, tt, 1.7, f);
+    drawAura(c, w, h, cx, cy, R, this.colors, tt, 1.7, f, Math.round(this.dust * 2.4));
     drawDust(c, h, cx, cy, R, f, tt, 1, 0, this.dust);
     // L'aura se fond dans le noir de la page : aucun bord de cadre visible.
     c.save(); c.globalCompositeOperation = 'destination-in';
