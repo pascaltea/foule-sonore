@@ -194,7 +194,8 @@ export function render(dt, t) {
   const acts = settings.palette === 'assemblee' || !PALETTES[settings.palette], ac = acts ? actColors() : null;
   const pal = acts ? [ac.ink.map((v) => v * 0.5), ac.ink, ac.ink.map((v) => 0.3 * v + 0.7)] : PALETTES[settings.palette].c;
   const q = QUALITY[state.perf.quality];
-  const count = Math.floor(MAX * q.n * (attract ? 0.3 : 0.15 + 0.85 * m.energy));
+  const show = state.session.ended > 0;       // présentation de la créature : la brume vit toute seule
+  const count = Math.floor(MAX * q.n * (show ? 0.7 : attract ? 0.3 : 0.15 + 0.85 * m.energy));
   stepParticles(dt, t, count, attract);
 
   // La palette glisse avec l'harmonie ; les accents déclenchent flash et onde de choc.
@@ -228,7 +229,7 @@ export function render(dt, t) {
   gl.vertexAttribPointer(0, 4, gl.FLOAT, false, 0, 0);
   const pulse = d.tier > 0 || attract ? mu.beatPulse : mu.beatPulse * 0.4;
   gl.uniform1f(pP.u.size, fh / 1080 * 2.4 * (1 + 0.5 * pulse));
-  gl.uniform1f(pP.u.bright, (d.hush ? 0.25 : state.session.ended > 0 ? 0.2 : 1) * (attract ? 0.22 : (0.07 + 0.13 * m.energy) * (d.tier >= 2 ? 0.55 : 1)) * (1 + 0.5 * pulse) + 0.1 * mu.accent);
+  gl.uniform1f(pP.u.bright, (d.hush ? 0.25 : 1) * (state.session.ended > 0 ? 0.105 : attract ? 0.22 : (0.07 + 0.13 * m.energy) * (d.tier >= 2 ? 0.55 : 1)) * (1 + 0.5 * pulse) + 0.1 * mu.accent);
   gl.uniform1f(pP.u.harm, harm);
   secU.fill(0);
   settings.sectors.forEach((s, i) => {

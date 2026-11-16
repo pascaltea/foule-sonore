@@ -5,7 +5,8 @@
 const GS = 900, DEPTH = 0.92 * GS / 2;
 export const GREEN = [0.24, 0.92, 0.59];
 // Forme neutre : le dôme. C'est celle de l'accueil, de l'attente et du début de chaque session.
-export const PLAIN = { amp: 8, freq: 3, dens: 0.9, split: 0, gap: 0, rig: 1, sx: 1, sy: 1, crest: 0, sharp: 1, k: 10, lobes: 0, horns: 0, eGap: 0.27, eSize: 1, eOpen: 0.75, eAsym: 0, veins: 0, over: 0 };
+export const PLAIN = { amp: 8, freq: 3, dens: 0.9, split: 0, gap: 0, rig: 1, sx: 1, sy: 1, crest: 0, sharp: 1, k: 10, lobes: 0, horns: 0, eGap: 0.27, eSize: 1, eOpen: 0.75, eAsym: 0, veins: 0, over: 0,
+  aPulse: 0.5, aWrap: 0.6, aReach: 0.4, aSpeed: 1, aHush: 0, aWaves: 0, aSpark: 0, aCross: 0 };
 
 const clamp = (v, a = 0, b = 1) => (v < a ? a : v > b ? b : v);
 export const css = (c, a = 1) => `rgba(${(c[0] * 255) | 0},${(c[1] * 255) | 0},${(c[2] * 255) | 0},${a})`;
@@ -91,19 +92,64 @@ export function outline(c, cx, cy, R, o) {
 
 // Aura : des nappes de couleur (celles des pays traversés, et le vert de Genève) qui tournent lentement derrière
 // la créature. Elle ne s'arrête jamais et ne repasse jamais exactement au même endroit.
-export function drawAura(c, w, ground, cx, cy, R, colors, t, strength = 1) {
+// Le souffle de l'aura, partagé par la scène et par les pages publiques : elle bat régulièrement si le trio a tenu
+// ensemble, et elle retient son souffle autant de fois qu'il a su se taire.
+export function auraBreath(f, t) {
+  const beat = 0.5 + 0.5 * Math.sin(t * 5.2), pulse = 1 + f.aPulse * (1.1 * beat ** 3 - 0.3);
+  const hold = f.aHush > 0 ? 1 - 0.85 * Math.max(0, Math.sin(t * 6.2832 / (13 - 2 * f.aHush))) ** 10 : 1;
+  return pulse * hold;
+}
+// L'aura dit quelque chose de la créature. Elle bat (ils ont tenu ensemble) ou elle erre (ils ont cherché) ; elle
+// l'enveloppe d'un seul halo (ils se sont fait de la place) ou monte en colonnes séparées (chacun sa voix) ; elle
+// s'ouvre large aux couleurs des pays (ils sont allés vers l'autre) ; elle retient son souffle (leurs silences),
+// lance des ondes vertes (chaque débordement) et des étincelles (leurs sauts).
+export function drawAura(c, w, ground, cx, cy, R, colors, t, strength = 1, f = PLAIN) {
   c.save(); c.globalCompositeOperation = 'lighter';
-  const cols = [...colors, GREEN];
-  for (let k = 0; k < cols.length; k++) {
-    const a = t * (0.11 + 0.023 * k) * (k % 2 ? -1 : 1) + k * 2.4, d = R * (0.35 + 0.3 * Math.sin(t * 0.17 + k * 1.3));
-    const x = cx + d * Math.cos(a) * 1.25, y = cy - R * 0.55 + d * Math.sin(a) * 0.6, rad = R * (1.05 + 0.3 * Math.sin(t * 0.23 + k * 2));
-    const gd = c.createRadialGradient(x, y, 0, x, y, rad);
-    gd.addColorStop(0, css(cols[k], 0.2 * strength)); gd.addColorStop(0.5, css(cols[k], 0.07 * strength)); gd.addColorStop(1, css(cols[k], 0));
-    c.fillStyle = gd; c.fillRect(0, 0, w, ground);
+  const cols = [...colors, GREEN], n = cols.length, tt = t * f.aSpeed, wrap = f.aWrap, reach = 0.55 + 0.9 * f.aReach, stray = 1 - f.aPulse;
+  const k0 = strength * auraBreath(f, t);
+  const blob = (x, y, rx, ry, col, a) => {
+    if (a <= 0.004) return;
+    c.save(); c.translate(x, y); c.scale(rx, ry);
+    const gd = c.createRadialGradient(0, 0, 0, 0, 0, 1);
+    gd.addColorStop(0, css(col, a)); gd.addColorStop(0.5, css(col, a * 0.35)); gd.addColorStop(1, css(col, 0));
+    c.fillStyle = gd; c.fillRect(-1, -1, 2, Math.min(2, 1 + (ground - y) / ry)); c.restore();
+  };
+  // Le halo : serré autour d'elle, ou des foyers qui se tiennent à distance les uns des autres.
+  for (let k = 0; k < n; k++) {
+    const a = tt * (0.11 + 0.023 * k) * (k % 2 ? -1 : 1) + k * 2.4, d = R * (0.3 + 0.25 * Math.sin(tt * 0.17 + k * 1.3));
+    const xo = cx + d * Math.cos(a) * 1.25, yo = cy - R * 0.55 + d * Math.sin(a) * 0.6;
+    const xs = cx + R * 1.5 * reach * ((k + 0.5) / n - 0.5) * 2 + R * 0.3 * stray * Math.sin(tt * 0.31 + k * 5), ys = cy - R * (1 + 0.2 * Math.sin(tt * 0.2 + k * 2));
+    const x = xs + (xo - xs) * wrap, y = ys + (yo - ys) * wrap, rad = R * (0.75 + 0.35 * reach + 0.25 * Math.sin(tt * 0.23 + k * 2));
+    blob(x, y, rad * (0.55 + 0.45 * wrap), rad * (1.5 - 0.5 * wrap), cols[k], 0.2 * k0);
+  }
+  // La brume qui monte : droite quand le battement a tenu, vagabonde quand ils ont cherché ; ses courants se croisent s'ils ont échangé leurs places.
+  const M = 7;
+  for (let k = 0; k < M; k++) {
+    const p = (tt * (0.05 + 0.006 * (k % 3)) + k * 0.381) % 1, side = ((k * 0.618) % 1 - 0.5) * 2, life = Math.sin(3.1416 * p);
+    const x = cx + R * 1.7 * reach * side * (1 - f.aCross * 1.6 * p) + R * 0.35 * stray * Math.sin(tt * 0.5 + k * 3 + p * 5);
+    blob(x, ground - R * (0.3 + 2.3 * p), R * (0.2 + 0.16 * p), R * (0.75 + 0.5 * p), cols[k % n], 0.13 * k0 * life);
+  }
+  // Une onde par débordement : Genève qui déborde encore.
+  if (f.aWaves >= 0.5) {
+    const every = 15 / Math.min(6, f.aWaves) + 1.5, p = (t % every) / 2.6;
+    if (p < 1) {
+      // Un souffle, pas un trait : un anneau fondu qui s'élargit en s'effaçant.
+      const rr = 1 + 1.5 * p, wd = 0.12 + 0.45 * p, out = rr + wd, al = 0.22 * strength * (1 - p) ** 1.5;
+      c.save(); c.translate(cx, cy); c.scale(R * f.sx, R * f.sy);
+      const gd = c.createRadialGradient(0, 0, Math.max(0, rr - wd), 0, 0, out);
+      gd.addColorStop(0, css(GREEN, 0)); gd.addColorStop(0.5, css(GREEN, al)); gd.addColorStop(1, css(GREEN, 0));
+      c.fillStyle = gd; c.fillRect(-out, -out, 2 * out, out + (ground - cy) / (R * f.sy)); c.restore();
+    }
+  }
+  // Leurs sauts : des étincelles qui bondissent de son dos.
+  const sparks = Math.round(14 * f.aSpark);
+  for (let k = 0; k < sparks; k++) {
+    const p = (t * (0.45 + 0.05 * (k % 4)) + k * 0.277) % 1, th = Math.PI * (1.12 + 0.76 * ((k * 0.618) % 1)), hop = Math.sin(Math.PI * p) * R * (0.25 + 0.3 * ((k * 0.37) % 1));
+    const x = cx + R * f.sx * Math.cos(th) * 1.02, y = cy + R * f.sy * Math.sin(th) - hop, s = Math.max(1.5, R * 0.012);
+    if (y < ground) { c.fillStyle = css([0.85, 1, 0.9], 0.9 * Math.sin(Math.PI * p)); c.fillRect(x, y, s, s); }
   }
   c.restore();
 }
-// Grain vert autour du contour : la trace durable des débordements, qui respire ; et le jaillissement du geste.
 export function drawDust(c, ground, cx, cy, R, f, t, alpha = 1, flood = 0, count = 4200) {
   const spill = f.over + 1.6 * flood;
   if (spill < 0.02) return;
@@ -130,12 +176,13 @@ function drawBody(c, cx, cy, R, f, glow, beat) {
   c.lineWidth = Math.max(1.5, R * 0.008); c.strokeStyle = rim; outline(c, cx, cy, R, f); c.stroke();
 }
 // Deux lueurs au ras du sol : leur écart, leur taille et leur ouverture parlent du trio.
-export function drawEyes(c, ground, cx, R, f, open) {
+// wide (0 à 1) : elle écarquille les yeux ; look (-1 à 1) : elle regarde d'un côté.
+export function drawEyes(c, ground, cx, R, f, open, wide = 0, look = 0) {
   if (open <= 0.01) return;
   for (const side of [-1, 1]) {
-    const er = R * 0.075 * f.eSize * (side > 0 ? 1 + f.eAsym : 1 - f.eAsym * 0.4), ex = cx + side * R * f.sx * f.eGap, op = open * f.eOpen / 0.75;
+    const er = R * 0.075 * f.eSize * (side > 0 ? 1 + f.eAsym : 1 - f.eAsym * 0.4) * (1 + 0.38 * wide), ex = cx + side * R * f.sx * f.eGap + look * R * 0.035, op = open * (f.eOpen + (1.25 - f.eOpen) * wide) / 0.75;
     c.save();
-    c.beginPath(); c.rect(ex - er * 2, ground - er * 0.8 * Math.min(1.3, op), er * 4, er * 1.3); c.clip();
+    c.beginPath(); c.rect(ex - er * 2, ground - er * 0.8 * Math.min(1.7, op), er * 4, er * 1.7); c.clip();
     const e = c.createRadialGradient(ex, ground, er * 0.2, ex, ground, er * 1.5);
     e.addColorStop(0, css([1, 1, 1], 0.95)); e.addColorStop(0.62, css([1, 1, 1], 0.9)); e.addColorStop(0.7, css([1, 1, 1], 0.18)); e.addColorStop(1, css([1, 1, 1], 0));
     c.fillStyle = e; c.fillRect(ex - er * 2, ground - er * 2, er * 4, er * 2);
@@ -151,17 +198,40 @@ export function drawCreature(c, w, ground, cx, cy, R, o, f) {
     halo.addColorStop(0, css(o.ink, 0.5 * o.glow * (0.85 + 0.15 * o.beat))); halo.addColorStop(0.45, css(o.ink, 0.14 * o.glow)); halo.addColorStop(1, css(o.ink, 0));
     c.fillStyle = halo; c.fillRect(0, 0, w, ground);
   }
-  if (o.aura) drawAura(c, w, ground, cx, cy, R, o.aura, o.t || 0, o.auraStrength ?? 1);
+  if (o.aura) drawAura(c, w, ground, cx, cy, R, o.aura, o.t || 0, o.auraStrength ?? 1, f);
   drawDust(c, ground, cx, cy, R, f, o.t || 0, o.glow, o.flood || 0);
+  // Vivante : elle se balance à peine, le pied au sol, et respire.
+  const life = o.life || 0, t = o.t || 0;
+  if (life > 0) { c.save(); alive(c, cx, ground, t, life); }
   drawBody(c, cx, cy, R, f, o.glow, o.beat);
-  drawEyes(c, ground, cx, R, f, o.eyes);
+  if (life > 0) c.restore();
+  drawEyes(c, ground, cx, R, f, o.eyes, o.wide || 0, o.look || 0);
+}
+// Balancement et souffle autour du point d'appui au sol.
+export function alive(c, cx, ground, t, k = 1) {
+  const sway = 0.02 * k * Math.sin(t * 0.55) + 0.008 * k * Math.sin(t * 1.3 + 1), br = 1 + 0.022 * k * Math.sin(t * 0.9);
+  c.translate(cx, ground); c.transform(1, 0, -sway, 1, 0, 0); c.scale(1 / Math.sqrt(br), br); c.translate(-cx, -ground);
+}
+// Le regard d'une créature au repos : de temps en temps elle écarquille les yeux, puis regarde ailleurs.
+export class Gaze {
+  constructor(seed = 1) { this.wide = 0; this.look = 0; this.to = 0; this.blink = 0; this.nextWide = 2 + (seed * 1.37) % 4; this.nextBlink = 1.5 + (seed * 0.77) % 3; this.nextLook = 1 + (seed * 2.1) % 3; this.hold = 0; }
+  step(dt) {
+    this.nextWide -= dt; this.nextBlink -= dt; this.nextLook -= dt;
+    if (this.nextWide < 0) { this.hold = 1.1 + Math.random() * 0.9; this.nextWide = 5 + Math.random() * 6; }
+    if (this.nextBlink < 0) { this.blink = 1; this.nextBlink = 2.2 + Math.random() * 4; }
+    if (this.nextLook < 0) { this.to = (Math.random() * 2 - 1) * (Math.random() < 0.35 ? 0 : 1); this.nextLook = 1.8 + Math.random() * 3.5; }
+    this.hold = Math.max(0, this.hold - dt);
+    this.wide += ((this.hold > 0 ? 1 : 0) - this.wide) * Math.min(1, dt * (this.hold > 0 ? 9 : 2.5));
+    this.look += (this.to - this.look) * Math.min(1, dt * 3);
+    this.blink = Math.max(0, this.blink - dt * 6);
+  }
 }
 
 // Une créature vivante dans un petit cadre (galerie, page d'une créature) : son corps est dessiné une fois pour
 // toutes, puis seuls l'aura, le grain, un léger souffle et le clignement des lueurs sont rejoués à chaque image.
 export class Living {
   constructor(el, item, { dust = 900 } = {}) {
-    this.el = el; this.item = item; this.dust = dust; this.phase = (item.n || 1) * 1.7; this.blink = 0; this.next = 2 + ((item.n || 1) * 0.37) % 4; this.size = 0;
+    this.el = el; this.item = item; this.dust = dust; this.phase = (item.n || 1) * 1.7; this.gaze = new Gaze(item.n || 1);
     this.colors = item.bands.map((b) => b.color).filter((c, i, a) => a.findIndex((x) => x === c) === i).slice(-4);
   }
   build(w, h) {
@@ -176,16 +246,20 @@ export class Living {
     if (!w || !h) return;
     if (w !== this.w || h !== this.h) { el.width = w; el.height = h; this.build(w, h); }
     const c = el.getContext('2d'), tt = t + this.phase, f = this.f, R = this.R, cx = w / 2, cy = h + R * f.sy * 0.08;
-    this.next -= dt; if (this.next < 0) { this.blink = 1; this.next = 2.5 + (tt * 7.3) % 5; }
-    this.blink = Math.max(0, this.blink - dt * 6);
+    this.gaze.step(dt);
     c.clearRect(0, 0, w, h);
-    drawAura(c, w, h, cx, cy, R, this.colors, tt, 1.7);
+    drawAura(c, w, h, cx, cy, R, this.colors, tt, 1.7, f);
     drawDust(c, h, cx, cy, R, f, tt, 1, 0, this.dust);
-    const s = 1 + 0.012 * Math.sin(tt * 0.9);            // elle respire
-    c.save(); c.translate(cx, h); c.scale(s, 1 / s * (1 + 0.02 * Math.sin(tt * 0.9))); c.translate(-cx, -h);
+    // L'aura se fond dans le noir de la page : aucun bord de cadre visible.
+    c.save(); c.globalCompositeOperation = 'destination-in';
+    let g = c.createLinearGradient(0, 0, w, 0); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(0.16, '#000'); g.addColorStop(0.84, '#000'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    c.fillStyle = g; c.fillRect(0, 0, w, h);
+    g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(0.22, '#000');
+    c.fillStyle = g; c.fillRect(0, 0, w, h); c.restore();
+    c.save(); alive(c, cx, h, tt, 1);
     c.drawImage(this.body, 0, 0);
     c.restore();
-    drawEyes(c, h, cx, R, f, 1 - this.blink);
+    drawEyes(c, h, cx, R, f, 1 - this.gaze.blink, this.gaze.wide, this.gaze.look);
   }
 }
 // Anime toutes les créatures visibles d'une page avec une seule horloge.

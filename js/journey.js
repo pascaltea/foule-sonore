@@ -9,6 +9,9 @@ import { PRESETS } from './music.js';
 import { applyPreset } from './ui.js';
 import { portrait } from './creature.js';
 import { slots } from './pose.js';
+import { splat } from './capture.js';
+import { GW, GH } from './state.js';
+import { PLAIN, auraBreath } from './creature-draw.js';
 import { formOf, describe, whoOf, encode, decode } from './portrait.js';
 
 const GKEY = 'foule-sonore-galerie', TOUR = ['mali', 'levant', 'inde', 'japon', 'caraibes'], MAX_ITEMS = 48, STOPS = 3;
@@ -97,7 +100,26 @@ export function update(dt) {
   if (ss.on && !J.wasOn && ss.ended === 0) begin();
   J.wasOn = ss.on;
   if (!ss.on) { if (J.bands.length) { J.bands = []; J.cur = ''; J.form = null; J.done = 0; A = null; } return; }
-  if (ss.ended > 0) { if (ss.ends !== J.ends && A) { J.ends = ss.ends; finish(); } return; }
+  if (ss.ended > 0) {
+    if (ss.ends !== J.ends && A) { J.ends = ss.ends; finish(); }
+    // Présentation de la créature : la brume ne dépend plus des joueurs, elle prend le tempérament du trio.
+    // Elle bat ou elle erre, elle enveloppe la créature ou monte en trois colonnes, elle s'ouvre plus ou moins large,
+    // elle retient son souffle, et une onde part d'elle pour chaque débordement.
+    const t = performance.now() / 1000, f = { ...PLAIN, ...(J.form || {}) }, tt = t * f.aSpeed, k0 = auraBreath(f, t), reach = 0.55 + 0.9 * f.aReach, stray = 1 - f.aPulse;
+    for (let k = 0; k < 7; k++) {
+      const a = tt * (0.22 + 0.03 * k) * (k % 2 ? -1 : 1) + k * 0.9, rad = 0.1 + 0.12 * (0.5 + 0.5 * Math.sin(tt * 0.13 + k * 1.7));
+      const xo = 0.5 + rad * Math.cos(a) * 1.5, yo = 0.55 - 0.15 * Math.sin(tt * 0.11 + k) + rad * Math.sin(a) * 0.5;      // autour d'elle
+      const col = k % 3, xs = 0.5 + (col - 1) * 0.3 * reach + 0.05 * stray * Math.sin(tt * 0.4 + k * 3), ys = 0.25 + 0.6 * ((tt * 0.07 + k * 0.37) % 1);   // une colonne par place
+      const x = xs + (xo - xs) * f.aWrap, y = ys + (yo - ys) * f.aWrap;
+      const swirl = f.aWrap * 4.5, cross = f.aCross * 3 * (1 - col) * (k % 2 ? 1 : 0.4);
+      splat(GW * x, GH * y, (-Math.sin(a) * swirl + cross + 3 * stray * Math.sin(tt * 0.3 + k * 2)) * k0, (-2.4 - 2.6 * (1 - f.aWrap) - 1.6 * Math.abs(Math.cos(a))) * f.aSpeed * k0, 3.4);
+    }
+    if (f.aWaves >= 0.5) {
+      const every = 15 / Math.min(6, f.aWaves) + 1.5, p = (t % every) / 1.2;
+      if (p < 1) for (let k = 0; k < 9; k++) { const a = Math.PI * (1 + k / 8), r = 0.16 + 0.2 * p; splat(GW * (0.5 + r * Math.cos(a)), GH * (0.92 + r * 1.7 * Math.sin(a)), Math.cos(a) * 9 * (1 - p), Math.sin(a) * 9 * (1 - p), 3); }
+    }
+    return;
+  }
   J.ends = ss.ends;
   if (!A) begin();
 

@@ -20,6 +20,10 @@ export function formOf(t) {
     sx: 0.74 + 0.7 * t.o, sy: 1.2 - 0.46 * t.o, crest: 0.13 * (1 - t.c) * (0.4 + 0.6 * t.e) + 0.03 * (1 - t.r), sharp: 0.4 + 1.2 * t.r, k: 6 + 10 * t.e,
     lobes: 0.3 * (1 - t.c) ** 1.5, horns: hn, eGap: 0.13 + 0.34 * (1 - t.c), eSize: 0.65 + 1.1 * t.o, eOpen: 0.3 + 0.7 * t.e, eAsym: 0.3 * (1 - t.r) * (t.e > 0.5 ? 1 : 0),
     veins: Math.min(6, t.overflows), over: t.o * Math.min(1, t.overflows / 3 + 0.15),
+    // Le tempérament de l'aura : elle bat (tenir ensemble), elle enveloppe (se faire de la place), elle s'ouvre (aller vers l'autre),
+    // elle retient son souffle (silences), elle déborde (ondes), elle étincelle (sauts), ses courants se croisent (échanges).
+    aPulse: t.r, aWrap: t.c, aReach: t.o, aSpeed: 0.55 + 0.9 * t.e, aHush: Math.min(3, t.hushes), aWaves: Math.min(6, t.overflows),
+    aSpark: Math.min(1, t.jumps / 8), aCross: Math.min(1, t.swaps / 6),
   };
 }
 
@@ -44,7 +48,6 @@ export const TEXTS = {
   silences: (n) => `${nb(n)[0].toUpperCase() + nb(n).slice(1)} silences tenus ensemble : c'est rare.`,
   sauts: (n) => `Vous avez sauté ${nb(n)} fois sans perdre le fil.`,
   bras: 'Vous avez ouvert les bras avant même de savoir quoi jouer.',
-  deborde: (n) => (n === 1 ? 'Genève a débordé une fois.' : `Genève a débordé ${nb(n)} fois.`),
 };
 export function describe(t, group = true) {
   if (!group) return { nick: 'la Multitude', text: TEXTS.foule };
@@ -63,7 +66,6 @@ export function describe(t, group = true) {
   if (t.jumps >= 6) facts.push(TEXTS.sauts(t.jumps));
   if (t.o > 0.75 && !facts.length) facts.push(TEXTS.bras);
   const out = [a, ...facts.slice(0, 2)];
-  if (t.overflows >= 1) out.push(TEXTS.deborde(t.overflows));
   return { nick, text: out.join(' ') };
 }
 export const whoOf = (n, group = true) => (!group ? 'd\'une foule' : n <= 1 ? 'd\'une personne seule' : `de ${['deux', 'trois', 'quatre', 'cinq'][Math.min(n, 5) - 2]} inconnus`);
