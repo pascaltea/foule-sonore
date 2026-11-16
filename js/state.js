@@ -69,6 +69,8 @@ export const settings = Object.assign({
   custom: false,      // un instrument a été changé à la main depuis le choix de la configuration
   sessionMin: 5,      // durée d'une session en minutes ; 0 = libre
   hints: true,        // consignes de jeu affichées au public
+  remoteOn: false,    // régie sur téléphone, par Internet
+  room: '',           // code secret du canal de régie
   cameraId: '',
   sensitivity: 1.3,   // foule large et lointaine : gain un peu relevé par défaut
   scale: 'pentaMin',

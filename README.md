@@ -52,7 +52,12 @@ Les deux derniers gestes demandent d'être au moins deux. Des consignes discrèt
 
 Une session démarre au premier mouvement et dure 5 minutes par défaut (réglable, ou libre). La dernière demi-minute monte plus vite, puis un accord final s'éteint et l'écran invite les suivants.
 
-La régie s'ouvre dans une autre fenêtre du même navigateur (touche `G`, ou `regie.html`) : on la garde sur l'écran de l'ordinateur pendant que la scène est projetée. Elle change de voyage en direct (touches `1` à `6`), choisit les instruments, règle volumes, durée et sensibilité, lance le final. Aucun serveur : les deux fenêtres doivent être dans le même navigateur, sur la même machine.
+La régie se pilote de deux façons :
+
+- **Sur l'ordinateur** : touche `G`, elle s'ouvre dans une autre fenêtre du même navigateur (régie sur l'écran de l'ordinateur, scène projetée). Aucun réseau nécessaire.
+- **Sur un téléphone** : dans les réglages (`H`), cocher « Régie sur téléphone » et scanner le code QR. Le téléphone peut être sur n'importe quel réseau ; la scène et lui passent par deux relais de messagerie publics (`js/relay.js`), il faut donc Internet des deux côtés. Qui a le code pilote la scène : ne pas le projeter. « Nouveau code » coupe les téléphones déjà reliés. Seuls des ordres de régie et l'état de la scène transitent, jamais d'image ni de son.
+
+Elle change de voyage en direct (touches `1` à `6` au clavier), choisit les instruments, règle volumes, durée et sensibilité, lance le final.
 
 ## Principe
 
@@ -86,4 +91,4 @@ Les réglages sont mémorisés dans le navigateur ; les boutons Exporter / Impor
 
 ## Crédits
 
-Titres en Anton (SIL Open Font License, voir `fonts/OFL-Anton.txt`).
+Titres en Anton (SIL Open Font License, voir `fonts/OFL-Anton.txt`). Bibliothèques embarquées dans `vendor/` : MQTT.js et qrcode-generator (licence MIT).

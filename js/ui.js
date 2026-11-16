@@ -3,6 +3,7 @@ import { GW, GH, GN, MAX_SECTORS, SECTOR_COLORS, ZONES, LAYOUTS, makeLayout, san
   state, settings, saveSettings, clamp, setMode, configOf, setConfig, sanitizePlayers, playersConfig, trio } from './state.js';
 import { SCALES, KEYS, INSTRUMENTS, PRESETS } from './music.js';
 import { endSession, newSession } from './metrics.js';
+import { setNet, netInfo, regieUrl } from './remote.js';
 import { PALETTES } from './visuals.js';
 import * as capture from './capture.js';
 import { slots, BONES, status as poseStatus, reset as resetPose } from './pose.js';
@@ -221,6 +222,21 @@ export function applyPreset(id) {
 export const presetLine = (id = settings.preset) => { const p = PRESETS[id]; return p ? `${p.name} · ${p.insts.map((k) => INSTRUMENTS[k]).join(', ')}` : ''; };
 function openRegie() { window.open('regie.html', 'foule-regie', 'width=540,height=900'); }
 
+// Régie sur téléphone : un code QR à scanner, qui porte l'adresse de la régie et le code secret du canal.
+let qrFor = '';
+async function showNet() {
+  const on = settings.remoteOn, url = on ? regieUrl() : '';
+  $('netOn').checked = on; $('netBox').classList.toggle('on', on);
+  if (!on || url === qrFor) return;
+  qrFor = url;
+  try {
+    const qrcode = (await import('../vendor/qrcode.mjs')).default, q = qrcode(0, 'M');
+    q.addData(url); q.make();
+    $('qr').innerHTML = q.createSvgTag({ cellSize: 4, margin: 3, scalable: true });
+  } catch { $('qr').textContent = url; }
+}
+async function toggleNet(on, fresh) { await setNet(on, fresh); showNet(); }
+
 // ---------- Régie à distance (autre fenêtre du même navigateur, voir remote.js) ----------
 const REMOTE_SET = { volume: [0, 1], sensitivity: [0.3, 4], dramaSpeed: [0.25, 6], sessionMin: [0, 30], key: [0, 11] };
 export function remoteHello() {
@@ -239,7 +255,7 @@ export function remoteState() {
 }
 export function remoteApply(m) {
   const s = settings.sectors[m.i];
-  if (m.type === 'preset') applyPreset(m.id);
+  if (m.type === 'preset') applyPreset(m.preset);
   else if (m.type === 'inst' && s && INSTRUMENTS[m.inst]) { s.inst = m.inst; settings.custom = true; sectorsChanged(); sync(); }
   else if (m.type === 'vol' && s) { s.vol = clamp(+m.v, 0, 1.5); sectorsChanged(); }
   else if (m.type === 'mute' && s) { s.mute = !!m.v; sectorsChanged(); }
@@ -281,6 +297,10 @@ export function init(h) {
   $('sessionMin').onchange = (e) => { settings.sessionMin = +e.target.value; sync(); };
   $('hintsOn').onchange = (e) => { settings.hints = e.target.checked; sync(); };
   $('sessNew').onclick = newSession; $('sessEnd').onclick = endSession; $('openRegie').onclick = openRegie;
+  $('netOn').onchange = (e) => toggleNet(e.target.checked);
+  $('netNew').onclick = () => toggleNet(true, true);
+  $('netCopy').onclick = () => { navigator.clipboard?.writeText(regieUrl()).then(() => note('Lien de la régie copié.', 2500), () => note(regieUrl(), 9000)); };
+  showNet();
   fill($('layout'), [['', 'Personnalisé'], ...Object.entries(LAYOUTS).map(([k, l]) => [k, l.label])], '');
   $('sens').value = settings.sensitivity; $('vol').value = settings.volume; $('drama').value = settings.dramaSpeed;
 
@@ -437,6 +457,10 @@ function updateHints(now) {
   const dur = settings.sessionMin * 60;
   $('clock').style.width = (ss.on && dur && ss.ended === 0 ? clamp(ss.t / dur) * 100 : 0) + '%';
   $('cfg').classList.toggle('on', state.music.running && !d.attract);
+  if (settings.remoteOn && !$('panel').classList.contains('hidden')) {
+    const n = netInfo();
+    $('netInfo').textContent = !n.ready || !n.up ? 'Connexion au relais… (Internet requis)' : `Relais ${n.up}/${n.total} · ${n.phone ? 'téléphone relié' : 'en attente du téléphone'}`;
+  }
 }
 
 export function update() {

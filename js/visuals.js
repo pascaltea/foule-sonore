@@ -11,7 +11,7 @@ export const PALETTES = {
 };
 
 const MAX = 36000;
-const QUALITY = [{ n: 0.35, s: 0.6 }, { n: 0.6, s: 0.8 }, { n: 1, s: 1 }];
+const QUALITY = [{ n: 0.35, s: 0.75 }, { n: 0.6, s: 0.9 }, { n: 1, s: 1 }];     // en cas de ralentissement : moins de particules d'abord
 const px = new Float32Array(MAX), py = new Float32Array(MAX), vx = new Float32Array(MAX), vy = new Float32Array(MAX);
 const life = new Float32Array(MAX), sa = new Float32Array(MAX), sb = new Float32Array(MAX);
 const data = new Float32Array(MAX * 4);
@@ -23,6 +23,7 @@ for (let i = 0; i < MAX; i++) {
 let gl, cv, pP, pF, pO, quadBuf, partBuf, fbo = [], tex = [], fw = 0, fh = 0, cur = 0;
 let harm = 0, lastAccent = 0, lastBeat = 0;
 const shocks = [], secU = new Float32Array(28);
+const ex = new Float32Array(6), ey = new Float32Array(6), ew = new Float32Array(6), eh = new Float32Array(6);
 
 const VS_Q = 'attribute vec2 a; varying vec2 v; void main(){ v=a*.5+.5; gl_Position=vec4(a,0.,1.); }';
 const FS_FADE = `precision mediump float; uniform sampler2D t; uniform float fade, zoom; varying vec2 v;
@@ -83,7 +84,7 @@ export function init(canvas) {
 }
 
 function resize() {
-  const q = QUALITY[state.perf.quality], dpr = Math.min(devicePixelRatio || 1, 1.5);
+  const q = QUALITY[state.perf.quality], dpr = Math.min(devicePixelRatio || 1, 2);
   const w = Math.max(2, Math.round(cv.clientWidth * dpr * q.s)), h = Math.max(2, Math.round(cv.clientHeight * dpr * q.s));
   if (w === fw && h === fh) return;
   fw = w; fh = h; cv.width = w; cv.height = h;
@@ -106,10 +107,11 @@ function respawn(i, A) {
   for (let k = 0; k < 3; k++) {            // de préférence là où la foule bouge
     const c = (Math.random() * GN) | 0;
     if (A[c] > Math.random() * 0.7 + 0.05) {
-      x = ((c % GW) + Math.random()) / GW; y = (((c / GW) | 0) + Math.random()) / GH; break;
+      // dispersées sur trois cellules autour du mouvement : sinon la grille de captation se voit en pavés
+      x = ((c % GW) + Math.random() * 3 - 1) / GW; y = (((c / GW) | 0) + Math.random() * 3 - 1) / GH; break;
     }
   }
-  px[i] = x; py[i] = y; vx[i] = 0; vy[i] = 0; life[i] = 1.5 + Math.random() * 4;
+  px[i] = clamp(x, 0.001, 0.999); py[i] = clamp(y, 0.001, 0.999); vx[i] = 0; vy[i] = 0; life[i] = 1.5 + Math.random() * 4;
 }
 
 function stepParticles(dt, t, count, attract) {
@@ -121,13 +123,27 @@ function stepParticles(dt, t, count, attract) {
   const turb = attract ? 0.03 : 0.02 + 0.32 * m.energy * (1 - m.coherence);
   const ccx = attract ? 0.5 : 0.5 + (m.cx - 0.5) * 0.7, ccy = attract ? 0.5 : 0.5 + (m.cy - 0.5) * 0.7;
   const damp = Math.exp(-dt * 1.8), k4 = org * 4 * dt;
+  // Petit groupe : la teinte d'une personne s'estompe en ovale autour d'elle, au lieu de remplir son cadre rectangulaire.
+  const group = settings.mode === 'group', S = settings.sectors;
+  for (let z = 0; z < S.length && z < 6; z++) {
+    const s = S[z];
+    ex[z] = (s.x + s.w / 2) / GW; ey[z] = (s.y + s.h / 2) / GH; ew[z] = Math.max(0.02, s.w / GW * 0.45); eh[z] = Math.max(0.02, s.h / GH * 0.45);
+  }
   for (let i = 0; i < count; i++) {
     let x = px[i], y = py[i], ux = vx[i], uy = vy[i];
     const gi = Math.min(GH - 1, (y * GH) | 0) * GW + Math.min(GW - 1, (x * GW) | 0);
-    const a = A[gi];
+    // Champ de mouvement lu en douceur entre les cellules (interpolation), pour ne pas voir la grille.
+    const fxp = x * GW - 0.5, fyp = y * GH - 0.5;
+    const x0 = fxp < 0 ? 0 : fxp > GW - 1 ? GW - 1 : fxp | 0, y0 = fyp < 0 ? 0 : fyp > GH - 1 ? GH - 1 : fyp | 0;
+    const x1 = x0 < GW - 1 ? x0 + 1 : x0, y1 = y0 < GH - 1 ? y0 + 1 : y0;
+    const tx = fxp < 0 ? 0 : fxp - x0 > 1 ? 1 : fxp - x0, ty = fyp < 0 ? 0 : fyp - y0 > 1 ? 1 : fyp - y0;
+    const i00 = y0 * GW + x0, i10 = y0 * GW + x1, i01 = y1 * GW + x0, i11 = y1 * GW + x1;
+    const w00 = (1 - tx) * (1 - ty), w10 = tx * (1 - ty), w01 = (1 - tx) * ty, w11 = tx * ty;
+    const a = A[i00] * w00 + A[i10] * w10 + A[i01] * w01 + A[i11] * w11;
     if (a > 0.02) {
       const k = Math.min(1, dt * 10 * a);
-      ux += (FX[gi] / GW * 1.6 - ux) * k; uy += (FY[gi] / GH * 1.6 - uy) * k;
+      const fx = FX[i00] * w00 + FX[i10] * w10 + FX[i01] * w01 + FX[i11] * w11, fy = FY[i00] * w00 + FY[i10] * w10 + FY[i01] * w01 + FY[i11] * w11;
+      ux += (fx / GW * 1.6 - ux) * k; uy += (fy / GH * 1.6 - uy) * k;
     }
     if (org > 0.01) {
       const s = sa[i], b = sb[i];
@@ -154,7 +170,12 @@ function stepParticles(dt, t, count, attract) {
     if (life[i] < 0 || x < 0 || x > 1 || y < 0 || y > 1) { respawn(i, A); x = px[i]; y = py[i]; ux = uy = 0; }
     px[i] = x; py[i] = y; vx[i] = ux; vy[i] = uy;
     const j = i * 4;
-    data[j] = x; data[j + 1] = y; data[j + 2] = Math.min(1, Math.hypot(ux, uy) * 5 + a * 0.3); data[j + 3] = sa[i] * 0.999 + map[gi] + 1;
+    let z = map[gi];
+    if (group && z >= 0) {            // bord de la teinte tiré au sort particule par particule : un fondu, pas un contour
+      const dx = (x - ex[z]) / ew[z], dy = (y - ey[z]) / eh[z];
+      if (dx * dx + dy * dy > 0.35 + 0.9 * sb[i]) z = -1;
+    }
+    data[j] = x; data[j + 1] = y; data[j + 2] = Math.min(1, Math.hypot(ux, uy) * 5 + a * 0.3); data[j + 3] = sa[i] * 0.999 + z + 1;
   }
 }
 
