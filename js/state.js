@@ -41,7 +41,7 @@ export function sanitizeSectors(arr) {
   });
 }
 
-const KEY = 'foule-sonore-acg2';
+const KEY = 'foule-sonore-acg3';
 let saved = {};
 try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { /* stockage indisponible */ }
 
@@ -113,7 +113,7 @@ export const state = {
     cx: 0.5, cy: 0.5, dispersion: 0,
     pulseBpm: 0, pulseConf: 0, peakCount: 0, peakAge: 99, stillTime: 0, still: false,
   },
-  drama: { gauge: 0, tier: 0, phase: 'build', phaseT: 0, attract: true, tierUps: 0 },
+  drama: { gauge: 0, tier: 0, phase: 'build', phaseT: 0, attract: true, tierUps: 0, act: 0 },
   music: {
     running: false, bpm: 90, beatPulse: 0, beatCount: 0, accent: 0, accentCount: 0, accentX: 0.5, accentY: 0.5,
     chord: 0, level: 0,
@@ -131,6 +131,13 @@ export function rebuildSectorMap() {
   }
   for (let c = 0; c < GN; c++) if (map[c] >= 0) state.secArea[map[c]]++;
 }
+
+// Les trois affiches deviennent trois temps de lumière : la nuit verte de la cour, le bleu du lac, l'orange du matin.
+// Chaque temps a son encre et, comme sur l'affiche, une seule couleur d'accent (jaune, magenta, vert).
+const ACT_INK = [[0.03, 0.6, 0.36], [0.04, 0.5, 0.86], [1, 0.46, 0.04]];
+const ACT_ACCENT = [[1, 1, 0.33], [1, 0.4, 1], [0.04, 0.9, 0]];
+const mix3 = (T, a) => { const i = Math.min(1, Math.floor(a)), f = clamp(a - i); return T[i].map((v, k) => v + (T[i + 1][k] - v) * f); };
+export function actColors() { const a = clamp(state.drama.act, 0, 2); return { ink: mix3(ACT_INK, a), accent: mix3(ACT_ACCENT, a) }; }
 
 export function clamp(v, a = 0, b = 1) { return v < a ? a : v > b ? b : v; }
 // Lissage exponentiel avec temps de montée et de descente distincts.

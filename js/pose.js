@@ -46,7 +46,7 @@ export function reset() { slots.forEach((s) => { drop(s); s.lost = 0; s.fresh = 
 // Scène à trois : l'emplacement n'est plus l'ordre d'arrivée mais la place occupée (0 gauche, 1 centre, 2 droite).
 // Changer de place, c'est changer d'instrument. Une petite marge évite de basculer en restant sur une frontière ;
 // si deux personnes partagent une place, la plus centrée joue.
-const EDGE = 0.035;
+const EDGE = 0.02;
 function ingestZones(cs, dt) {
   const best = new Array(ZONES).fill(null);
   for (const c of cs) {
@@ -58,10 +58,24 @@ function ingestZones(cs, dt) {
       if (d < pd) { pd = d; prev = i; }
     }
     if (prev >= 0 && prev !== z && c.x > prev / ZONES - EDGE && c.x < (prev + 1) / ZONES + EDGE) z = prev;
-    c.same = prev === z;
+    c.same = prev === z; c.prev = prev;
     c.off = Math.abs(c.x - (z + 0.5) / ZONES);
     if (!best[z] || c.off < best[z].off) best[z] = c;
   }
+  // Passage d'une place à l'autre : la personne emporte ses gestes avec elle, l'ancien instrument se tait
+  // aussitôt et le nouveau prend le relais sans temps mort.
+  best.forEach((c, z) => {
+    if (!c || c.same || c.prev < 0) return;
+    const o = slots[c.prev], s = slots[z];
+    if (!s.on) {
+      for (const k of ['px', 'py', 'vx', 'vy', 'vis']) s[k].set(o[k]);
+      Object.assign(s, { torso: o.torso, cx: o.cx, cy: o.cy, jumpAge: o.jumpAge, tE: o.tE, tS: o.tS, tC: o.tC, tCy: o.tCy, on: true, fresh: false, lost: 0 });
+      const q = state.sec[z], p = state.sec[c.prev];
+      q.energy = p.energy; q.speed = p.speed; q.coherence = p.coherence; q.cy = p.cy; q.eFast = p.eFast; q.eSlow = p.eSlow;
+      c.same = true;
+    }
+    if (!best[c.prev]) { drop(o); state.sec[c.prev].energy *= 0.3; }
+  });
   slots.forEach((s, i) => {
     const c = i < ZONES ? best[i] : null;
     if (!c) { s.lost += dt; if (s.on && s.lost > 0.6) drop(s); return; }

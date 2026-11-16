@@ -1,9 +1,9 @@
 // Moteur visuel WebGL : particules poussées par le flux optique, traînées, ondes de choc.
 // L'image de la caméra n'est jamais affichée.
-import { GW, GH, GN, state, settings, clamp } from './state.js';
+import { GW, GH, GN, state, settings, actColors, clamp } from './state.js';
 
 export const PALETTES = {
-  assemblee: { label: 'Assemblée créative', c: [[0.04, 0.5, 0.3], [0.04, 0.53, 0.82], [1, 0.48, 0.04]] },
+  assemblee: { label: 'Assemblée créative (nuit, lac, matin)', c: [[0.03, 0.6, 0.36], [0.04, 0.5, 0.86], [1, 0.46, 0.04]] },
   braise: { label: 'Braise', c: [[1, 0.22, 0.04], [1, 0.62, 0.08], [1, 0.92, 0.55]] },
   aurore: { label: 'Aurore', c: [[0.05, 0.95, 0.7], [0.25, 0.45, 1], [0.95, 0.25, 0.85]] },
   ocean: { label: 'Océan', c: [[0, 0.3, 1], [0, 0.8, 0.9], [0.75, 1, 1]] },
@@ -169,7 +169,9 @@ export function render(dt, t) {
   resize();
   const m = state.m, d = state.drama, mu = state.music;
   const attract = d.attract;
-  const pal = (PALETTES[settings.palette] || PALETTES.assemblee).c;
+  // Palette « Assemblée créative » : une encre et un accent à la fois, qui changent avec le temps de lumière.
+  const acts = settings.palette === 'assemblee' || !PALETTES[settings.palette], ac = acts ? actColors() : null;
+  const pal = acts ? [ac.ink.map((v) => v * 0.5), ac.ink, ac.ink.map((v) => 0.3 * v + 0.7)] : PALETTES[settings.palette].c;
   const q = QUALITY[state.perf.quality];
   const count = Math.floor(MAX * q.n * (attract ? 0.3 : 0.15 + 0.85 * m.energy));
   stepParticles(dt, t, count, attract);
@@ -210,7 +212,8 @@ export function render(dt, t) {
   secU.fill(0);
   settings.sectors.forEach((s, i) => {
     const h = parseInt(s.color.slice(1), 16), j = (i + 1) * 4;
-    secU[j] = (h >> 16) / 255; secU[j + 1] = ((h >> 8) & 255) / 255; secU[j + 2] = (h & 255) / 255;
+    if (acts) for (let k = 0; k < 3; k++) secU[j + k] = 0.7 * (0.45 * ac.ink[k] + 0.55) + 0.3 * ac.accent[k];   // encre éclaircie, une pointe d'accent
+    else { secU[j] = (h >> 16) / 255; secU[j + 1] = ((h >> 8) & 255) / 255; secU[j + 2] = (h & 255) / 255; }
     secU[j + 3] = 1 + state.sec[i].pulse;
   });
   gl.uniform4fv(pP.u.sc, secU);

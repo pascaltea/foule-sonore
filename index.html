@@ -27,24 +27,20 @@
   #gauge.climax #gaugeFill { animation: throb .45s ease-in-out infinite alternate; }
   @keyframes throb { to { filter: brightness(1.7); } }
 
-  #invite { position: fixed; inset: 15vh 4vw 55vh; display: grid; place-content: center; justify-items: center; gap: 1.6vh;
-    pointer-events: none; text-align: center; opacity: 0; transition: opacity 1.5s; }
-  #invite b, #invite small { animation: breathe 3.2s ease-in-out infinite; }
-  #invite b { font: 400 min(7.6vw, 15vh)/0.98 var(--title); text-transform: uppercase; letter-spacing: .01em; color: #fff; }
-  #invite small { font: 400 clamp(13px, 1.7vw, 30px)/1.2 var(--title); text-transform: uppercase; letter-spacing: .2em; color: var(--p1); }
+  #invite { position: fixed; inset: 0 4vw 30vh; display: grid; place-content: center; justify-items: center; gap: 1.6vh;
+    pointer-events: none; text-align: center; opacity: 0; transition: opacity 2s; }
+  #invite b, #invite small { animation: breathe 5s ease-in-out infinite; font-family: var(--title); font-weight: 400; text-transform: uppercase; }
+  #invite b { font-size: clamp(16px, 2.3vw, 44px); line-height: 1.1; letter-spacing: .34em; margin-right: -.34em; color: #fff; }
+  #invite small { font-size: clamp(10px, .95vw, 18px); letter-spacing: .34em; margin-right: -.34em; color: var(--dim); }
   #invite.on { opacity: 1; }
-  @keyframes breathe { 50% { opacity: .5; } }
+  @keyframes breathe { 50% { opacity: .45; } }
 
-  /* Scène à trois : un bandeau par place, à sa couleur. */
+  /* Scène à trois : un repère discret par place. */
   #zones { position: fixed; inset: 0; pointer-events: none; display: none; grid-template-columns: repeat(3, 1fr); }
   #zones.on { display: grid; }
-  #zones div { padding: 3.5vh 2vw 0; text-align: center; opacity: .3; }
-  #zones div + div { border-left: 1px dashed rgba(255,255,255,.22); }
-  #zones em, #zones b, #zones span { display: block; font-family: var(--title); font-style: normal; font-weight: 400; text-transform: uppercase; }
-  #zones em { font-size: clamp(10px, 1.05vw, 20px); letter-spacing: .32em; color: #fff; }
-  #zones b { margin: .9vh 0 .8vh; font-size: clamp(20px, 3.4vw, 70px); line-height: 1; }
-  #zones span { font-size: clamp(10px, 1.05vw, 20px); letter-spacing: .2em; color: var(--dim); }
-
+  #zones div { padding: 4vh 2vw 0; text-align: center; opacity: .22; }
+  #zones b { display: inline-block; padding-top: 1.2vh; border-top: 1px solid #fff; font: 400 clamp(10px, .95vw, 18px)/1 var(--title);
+    text-transform: uppercase; letter-spacing: .34em; text-indent: .34em; color: #fff; }
   #note { position: fixed; bottom: 7vh; left: 50%; transform: translateX(-50%); padding: 8px 16px;
     border-radius: 4px; background: var(--bg); border: 1px solid var(--line); opacity: 0;
     transition: opacity .4s; pointer-events: none; max-width: 90vw; text-align: center; }
@@ -165,11 +161,11 @@
   <label class="crowdOnly">Découpage</label>
   <select id="layout" class="crowdOnly"></select>
   <div id="secList"></div>
-  <p class="hint trioOnly">La scène est partagée en trois places : gauche, centre, droite, vues depuis la salle (l'écran fait miroir). Qui se tient dans une place en joue l'instrument ; changer de place, c'est changer d'instrument. Bouger joue, lever les mains monte dans l'aigu, des gestes rapides accélèrent le rythme, sauter donne un accent. Seul, on tire la Créature du sommeil ; à deux, elle ouvre grand les yeux ; il faut jouer à trois pour la réveiller tout à fait.</p>
+  <p class="hint trioOnly">La scène est partagée en trois places : gauche, centre, droite, vues depuis la salle (l'écran fait miroir). Qui se tient dans une place en joue l'instrument ; changer de place, c'est changer d'instrument. Bouger joue, lever les mains monte dans l'aigu, des gestes rapides accélèrent le rythme, sauter donne un accent. Le dôme se lève à mesure qu'on joue ensemble : seul il affleure, à deux il monte, il faut jouer à trois pour qu'il s'éveille tout à fait.</p>
   <p class="hint groupOnly">Chaque personne détectée reçoit un instrument, dans l'ordre d'arrivée, et le garde tant qu'elle reste dans le champ. Bouger joue, lever les mains monte dans l'aigu, des gestes rapides accélèrent le rythme, sauter donne un accent.</p>
   <p class="hint crowdOnly">Sur la grille debug (<kbd>D</kbd>) : glisser dans le vide pour créer un secteur, glisser un secteur pour le déplacer, ses bords pour le redimensionner, <kbd>Suppr</kbd> pour l'effacer. 6 secteurs au plus.</p>
-  <label class="check"><input id="showSec" type="checkbox"> <span class="crowdOnly" style="float:none">Afficher les secteurs au public</span><span class="groupOnly" style="float:none">Afficher le cadre de chaque personne</span><span class="trioOnly" style="float:none">Afficher les trois places au public</span></label>
-  <label class="check"><input id="creatureOn" type="checkbox"> Afficher la Créature</label>
+  <label class="check"><input id="showSec" type="checkbox"> <span class="crowdOnly" style="float:none">Afficher les secteurs au public</span><span class="groupOnly" style="float:none">Afficher le cadre de chaque personne</span><span class="trioOnly" style="float:none">Afficher le repère des trois places</span></label>
+  <label class="check"><input id="creatureOn" type="checkbox"> Afficher le dôme (à la place de la jauge)</label>
   <div class="row">
     <button id="exportCfg">Exporter</button><button id="importCfg">Importer</button>
     <input id="importFile" type="file" accept="application/json,.json" hidden>
@@ -184,7 +180,7 @@
     <h1>Foule Sonore</h1>
     <p class="tag"><i style="color:var(--p1)">Imaginons</i> <i style="color:var(--p2)">la Créature</i> <i style="color:var(--p3)">ensemble</i></p>
     <div id="modes"><button data-mode="trio">Scène à trois</button><button data-mode="group">Petit groupe</button><button data-mode="crowd">Foule</button></div>
-    <p class="trioOnly">Trois personnes, trois places, trois instruments : à gauche, au centre, à droite. Chacune joue le sien avec tout le corps, et c'est ensemble qu'elles réveillent la Créature de l'affiche. La caméra sert uniquement à suivre les gestes : aucune image n'est affichée, enregistrée ni envoyée.</p>
+    <p class="trioOnly">Trois personnes, trois places, trois instruments : à gauche, au centre, à droite. Chacune joue le sien avec tout le corps, et c'est ensemble qu'elles réveillent la Créature. La caméra sert uniquement à suivre les gestes : aucune image n'est affichée, enregistrée ni envoyée.</p>
     <p class="crowdOnly">Le mouvement de la foule devient musique et lumière. La caméra sert uniquement à mesurer le mouvement : aucune image n'est affichée, enregistrée ni envoyée.</p>
     <p class="groupOnly">De 1 à 5 personnes : chacune devient un instrument, joué avec tout le corps. La caméra sert uniquement à suivre les gestes : aucune image n'est affichée, enregistrée ni envoyée.</p>
     <button id="btnStart">Démarrer avec la caméra</button>

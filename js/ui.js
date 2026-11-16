@@ -14,7 +14,7 @@ const CELL = 6, OX = 8, OY = 8;        // géométrie de la grille dans le canva
 let sel = -1, drag = null;
 const modeKey = () => (settings.mode === 'crowd' ? 'crowd' : settings.zones ? 'trio' : 'group');
 const INVITE = {
-  trio: ['Réveillons la Créature', 'Trois places, trois instruments : montez sur scène'],
+  trio: ['Réveillons la Créature', 'Trois places, trois instruments'],
   group: ['Réveillons la Créature', 'Bougez, elle vous regarde'],
   crowd: ['Bougez !', 'Imaginons la Créature ensemble'],
 };
@@ -51,7 +51,7 @@ function sync() {
   $('mode').value = mk;
   document.querySelectorAll('[data-mode]').forEach((b) => b.classList.toggle('active', b.dataset.mode === mk));
   $('invite').firstElementChild.textContent = INVITE[mk][0]; $('invite').lastElementChild.textContent = INVITE[mk][1];
-  $('creatureOn').checked = settings.creature;
+  $('creatureOn').checked = settings.creature; $('gauge').style.display = settings.creature ? 'none' : '';
   document.querySelectorAll('[data-g]').forEach((b) => { b.dataset.c ??= b.textContent; b.textContent = group ? b.dataset.g : b.dataset.c; });
   $('showSec').checked = settings.showSectors;
   $('sectors').classList.toggle('on', settings.showSectors && mk !== 'trio');
@@ -83,8 +83,8 @@ function sectorsChanged(rebuildList = true) {
   }
   $('sectors').innerHTML = S.map((s) => `<div style="left:${s.x / GW * 100}%;top:${s.y / GH * 100}%;width:${s.w / GW * 100}%;height:${s.h / GH * 100}%;
     border-color:${s.color};color:${s.color}"><span>${esc(s.name)} · ${INSTRUMENTS[s.inst] || ''}</span></div>`).join('');
-  // Scène à trois : un bandeau par place, au nom de son instrument, qui s'allume quand quelqu'un s'y tient.
-  $('zones').innerHTML = isTrio ? S.slice(0, ZONES).map((s) => `<div style="color:${s.color}"><em>${esc(s.name)}</em><b>${esc(INSTRUMENTS[s.inst] || '')}</b><span></span></div>`).join('') : '';
+  // Scène à trois : un repère discret par place, au nom de son instrument, qui s'allume quand quelqu'un s'y tient.
+  $('zones').innerHTML = isTrio ? S.slice(0, ZONES).map((s) => `<div><b>${esc(INSTRUMENTS[s.inst] || '')}</b></div>`).join('') : '';
   saveSettings();
 }
 
@@ -353,9 +353,8 @@ export function update() {
   if (settings.showSectors && trio()) {
     const el = $('zones').children;
     for (let i = 0; i < el.length; i++) {
-      const q = state.sec[i], s = settings.sectors[i], txt = s.present ? '\u00a0' : 'Place libre';
-      el[i].style.opacity = (s.present ? (q.on ? 0.8 : 0.55) : 0.3) + 0.2 * q.pulse;
-      if (el[i].lastElementChild.textContent !== txt) el[i].lastElementChild.textContent = txt;
+      const q = state.sec[i], s = settings.sectors[i];
+      el[i].style.opacity = (s.present ? (q.on ? 0.75 : 0.5) : 0.22) + 0.25 * q.pulse;
     }
   } else if (settings.showSectors) {            // le contour d'un secteur s'allume quand son instrument joue
     const el = $('sectors').children;

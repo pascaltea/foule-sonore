@@ -154,5 +154,7 @@ export function updateDrama(dt) {
     else if (down < tier) tier = down;
   }
   d.tier = tier;
+  // Temps de lumière : la nuit, le lac, le matin (voir actColors).
+  d.act = smooth(d.act, d.phase === 'climax' || g >= 0.66 ? 2 : g >= 0.34 ? 1 : 0, dt, 1.4);
   if (m.stillTime > 12) d.attract = true; else if (m.energy > 0.08) d.attract = false;
 }

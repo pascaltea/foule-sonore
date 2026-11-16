@@ -6,11 +6,11 @@ Tout tourne dans le navigateur (Chrome recommandé), sans serveur. La caméra se
 
 ## Assemblée créative de Genève
 
-Cette version porte la direction artistique de l'Assemblée créative de Genève (Downtown Studio, 19 novembre 2026) : fond noir, titres en capitales étroites, jaune, magenta et vert des affiches, et la Créature de l'affiche, qui incarne la jauge collective.
+Cette version est faite pour l'Assemblée créative de Genève (Downtown Studio, 19 novembre 2026). Elle évoque l'univers des affiches sans les reproduire : fond noir, grain d'encre, une seule couleur à la fois, et un dôme qui se lève au bas de l'écran.
 
 ## Trois modes
 
-- **Scène à trois** (par défaut) : la scène est partagée en trois places, gauche, centre, droite, vues depuis la salle (l'écran fait miroir). Chaque place a sa couleur et son instrument : batterie, piano, violon. Qui se tient dans une place en joue l'instrument ; changer de place, c'est changer d'instrument. Seul, on tire la Créature du sommeil ; à deux, elle ouvre grand les yeux ; il faut jouer à trois pour la réveiller tout à fait.
+- **Scène à trois** (par défaut) : la scène est partagée en trois places, gauche, centre, droite, vues depuis la salle (l'écran fait miroir). Chaque place a son instrument : batterie, piano, violon. On passe librement de l'une à l'autre : l'ancien instrument se tait aussitôt, le nouveau prend le relais. Seul, on fait affleurer le dôme ; à deux, il monte ; il faut jouer à trois pour qu'il s'éveille tout à fait.
 - **Petit groupe** (1 à 5 personnes) : chaque personne est suivie et devient un instrument, attribué dans l'ordre d'arrivée, qui la suit dans ses déplacements.
 - **Foule** : l'espace est découpé en secteurs fixes, chaque secteur joue son instrument. Aucune dépendance.
 
@@ -24,7 +24,7 @@ Le mode se choisit sur l'écran de démarrage ou dans la régie. Noms, couleurs 
 - **Secteurs** : l'espace est découpé en 1 à 6 zones ; chacune joue son propre instrument (batterie, piano, violon, basse, marimba, cloches, congas, chœur), entièrement synthétisé.
 - **Jauge collective** : bouger ensemble remplit une jauge qui débloque trois paliers puis un climax où tous les instruments jouent à l'unisson.
 - **Visuels** : particules WebGL poussées par le mouvement, teintées par secteur.
-- **La Créature** : le dessin d'origine de l'affiche, affiché tel quel au bas de l'écran (`img/creature.jpg`). Seuls ses yeux sont animés : elle dort au repos, ouvre les yeux avec la jauge, regarde la personne qui joue le plus, et la scène rayonne au climax.
+- **Le dôme et la lumière** : le dôme incarne la jauge collective. La couleur de la scène suit trois temps, un par affiche : le vert de la nuit, le bleu du lac, l'orange du matin. Deux lueurs s'ouvrent à la base du dôme quand les trois places jouent ensemble.
 
 ## Lancer en local
 
@@ -48,7 +48,5 @@ Puis ouvrir `http://localhost:8765` dans Chrome.
 Les réglages sont mémorisés dans le navigateur ; les boutons Exporter / Importer de la régie permettent de les transporter d'une machine à l'autre.
 
 ## Crédits
-
-La Créature et son décor sont l'illustration originale de l'affiche de l'Assemblée créative de Genève ; elle appartient à son auteur et à Downtown Studio et n'est pas couverte par la licence du code. `tools/build_creature.py` prépare les images à partir du fichier de l'affiche.
 
 Titres en Anton (SIL Open Font License, voir `fonts/OFL-Anton.txt`).
