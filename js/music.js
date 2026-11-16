@@ -50,7 +50,14 @@ export async function initLab() {
   if (!ac) { ac = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' }); build(); }
   await ac.resume();
   pad.level.gain.value = 0; pad.lfoGain.gain.value = 0; master.gain.value = 0.4;
-  return { ac, chan, INST, PRESETS, SCALES, mtof, deg2midi, v: { kick, snare, hat, crash, drum, tap, thump, pianoNote, bassNote, violinNote } };
+  // Les mêmes fonctions que la scène : ce qu'on entend dans l'atelier est ce qu'on entendra sur scène.
+  const sec = { x: 0, y: 0, w: 0, h: 0 };
+  return {
+    ac, chan, INST, PRESETS, SCALES, mtof, deg2midi,
+    gesture(place, inst, e) { const c = chan[place]; playGesture(place, c, sec, INST[inst], e, ac.currentTime); queue.length = 0; },
+    sustain(place, inst, q) { sustainGesture(place, chan[place], sec, INST[inst], q, ac.currentTime); queue.length = 0; },
+    use(place, inst) { const c = chan[place], def = INST[inst], now = ac.currentTime; swapInst(c, { inst }, now); chan.forEach((k) => k.level.gain.setTargetAtTime(k === c ? def.level : 0, now, 0.04)); c.rv.gain.setTargetAtTime(def.rev * 1.2, now, 0.1); c.dl.gain.setTargetAtTime(def.dly, now, 0.1); c.filt.frequency.setTargetAtTime(16000, now, 0.05); },
+  };
 }
 
 // Le son tel qu'il sort, pour l'enregistrement du morceau (record.js).
@@ -637,16 +644,19 @@ function gStroke(c, id, def, lv, v, t) {      // lv : 0 grave, 1 médium, 2 clai
 function playGesture(i, c, s, def, e, now) {
   const id = c.inst, t = gWhen(now), v = e.v ?? 0.7, h = e.h ?? 0.4, { n } = scaleInfo(), deg = Math.round(h * (2 * n - 1)), sus = SUSTAINED[id];
   const chant = i === 2 || sus, T = (dg, vv, len, tt) => gTone(c, id, def, dg, vv, len, tt), K = (lv, vv, tt) => gStroke(c, id, def, lv, vv, tt);
-  const big = e.type === 'ouvrir' || e.type === 'lever' || e.type === 'sauter';
+  const big = e.type === 'ouvrir' || e.type === 'lever' || e.type === 'sauter', trace = e.type === 'monter' || e.type === 'descendre' || e.type === 'balayer';
+  if (trace && sus) return;      // violon et flûtes : la note tenue suit déjà la main
   if (def.perc) {
     const lv = h < 0.24 ? 0 : h < 0.5 ? 1 : 2;
     if (e.type === 'frapper') K(lv, v, t);
     else if (e.type === 'ouvrir') { for (let k = 0; k < 5; k++) K(1, 0.35 + 0.13 * k, t + [0, 0.07, 0.13, 0.18, 0.22][k]); K(2, 1, t + 0.26); if (id === 'drums') crash(t + 0.26, 0.4, c.in); else K(0, 0.9, t + 0.26); }
     else if (e.type === 'refermer') { K(2, 1, t); tap(t, 0.5, c.in, 3200, 1.2, 0.015); }
     else if (e.type === 'pousser') { K(0, 1, t); thump(t, 46, 1, c.in, 0.4, 900); }
-    else if (e.type === 'balayer') K(2, 0.4 + 0.3 * v, t);
+    // Le mouvement joue : descendre = grave, monter = médium, de côté = clair. La main droite sonne un peu plus fort.
+    else if (e.type === 'descendre') K(0, v * (e.hand ? 1 : 0.85), t);
+    else if (e.type === 'monter') K(1, v * (e.hand ? 1 : 0.85), t);
+    else if (e.type === 'balayer') K(2, v, t);
     else if (e.type === 'lever') { let tt = t; for (let k = 0; k < 9; k++) { K(k % 2, 0.3 + 0.07 * k, tt); tt += 0.12 - 0.008 * k; } K(0, 1, tt); K(2, 1, tt); }
-    else if (e.type === 'accroupir') K(0, 0.8, t);
     else if (e.type === 'sauter') { K(0, 1, t); K(2, 1, t); K(1, 0.8, t + 0.09); }
   } else if (e.type === 'frapper') T(deg, v, sus ? 0.7 : 0.5, t);
   else if (e.type === 'ouvrir') { if (sus) T(deg + n, 1, 1.2, t); else [0, 2, 4, n].forEach((k, j) => T(deg + k, 0.6 + 0.1 * j, 0.9, t + j * 0.035)); }
@@ -654,12 +664,14 @@ function playGesture(i, c, s, def, e, now) {
     if (sus && c.viol) { c.viol.g.gain.cancelScheduledValues(t); c.viol.g.gain.setTargetAtTime(0, t, 0.02); c.viol.end = -1; }
     else { T(deg, 0.8, 0.1, t); T(deg + n, 0.6, 0.1, t + 0.07); }
   } else if (e.type === 'pousser') { if (chant) { T(deg - 1, 0.7, 0.1, t); T(deg, 1, 1, t + 0.09); } else T(-n, 1, 1.2, t); }
-  else if (e.type === 'balayer') { c.gSweep = e.first ? deg : (c.gSweep ?? deg) + e.dir; T(c.gSweep, 0.5 + 0.3 * v, sus ? 0.25 : 0.4, t); }
+  // Le mouvement joue. Monter ou descendre : la mélodie suit la main, note après note (la main gauche une octave
+  // plus bas : deux bras = deux voix). De côté : deux notes ensemble, vers l'aigu à droite, vers le grave à gauche.
+  else if (e.type === 'monter' || e.type === 'descendre') { if (!sus) T(deg - (e.hand ? 0 : n), v, 0.4, t); }
+  else if (e.type === 'balayer') { if (!sus) { const d0 = deg - (e.hand ? 0 : n); T(d0, v * 0.9, 0.4, t); T(d0 + (e.dir > 0 ? 2 : -3), v * 0.7, 0.4, t + 0.012); } }
   else if (e.type === 'lever') { if (sus) T(2 * n - 1, 1, 1.5, t); else for (let k = 0; k < 6; k++) T(deg - 2 + k, 0.5 + 0.08 * k, k === 5 ? 1 : 0.2, t + k * 0.06); }
-  else if (e.type === 'accroupir') T(-n, 0.8, 0.8, t);
   else if (e.type === 'sauter') { if (chant) for (let k = 0; k < 6; k++) T(deg + k, 0.6 + 0.06 * k, k === 5 ? 0.8 : 0.15, t + k * 0.045); else [-n, 0, 2, 4, n].forEach((k, j) => T(deg + k, 0.8, 1, t + j * 0.008)); }
   c.gAt = now; state.music.gestes = (state.music.gestes || 0) + 1;
-  queue.push({ t, sec: i });
+  if (!trace || now - (c.gVis || -9) > 0.12) { c.gVis = now; queue.push({ t, sec: i }); }
   if (big) queue.push({ t, accent: 1, x: (s.x + s.w / 2) / GW, y: (s.y + s.h / 2) / GH });
 }
 // Instruments tenus (violon, flûtes) : tant que la main bouge, la note suit sa hauteur. La main s'arrête, la note s'éteint.
@@ -669,7 +681,8 @@ function sustainGesture(i, c, s, def, q, now) {
   if (sp < 1.1 || now - (c.gSus || -9) < 0.09) return;
   c.gSus = now; c.gAt = now;
   const { n } = scaleInfo();
-  gTone(c, c.inst, def, Math.round(q.gh[k] * (2 * n - 1)), Math.min(1, 0.35 + sp / 9), 0.24, gWhen(now));
+  const two = Math.min(q.gspeed[0], q.gspeed[1]) > 1.2;      // les deux bras en mouvement : le son s'élargit
+  gTone(c, c.inst, def, Math.round(q.gh[k] * (2 * n - 1)), Math.min(1, (0.3 + sp / 9) * (two ? 1.35 : 1)), two ? 0.34 : 0.24, gWhen(now));
   if (now - (c.gVis || -9) > 0.25) { c.gVis = now; queue.push({ t: now, sec: i }); }
 }
 
@@ -699,7 +712,7 @@ export function update(dt) {
     if (gest) {
       c.on = !s.mute && s.present !== false && !ended;
       c.level.gain.setTargetAtTime(c.on ? def.level * s.vol : 0, now, 0.04);
-      if (c.on) { for (const g of q.gest || []) if (settings.gestes.includes(g.type)) playGesture(i, c, s, def, g, now); sustainGesture(i, c, s, def, q, now); }
+      if (c.on) { for (const g of q.gest || []) if (!settings.gestesOff.includes(g.type)) playGesture(i, c, s, def, g, now); sustainGesture(i, c, s, def, q, now); }
       q.on = c.on && now - (c.gAt || -9) < 1.2;          // « joue » = un son est parti il y a moins d'une seconde
     } else {
       c.on = q.on = !s.mute && s.present !== false && !quiet && (climax || (c.on ? e > 0.07 : e > 0.12));

@@ -66,7 +66,6 @@
         <span>Main gauche</span><div class="m"><i id="mL"></i></div><span id="nL"></span>
         <span>Main droite</span><div class="m"><i id="mR"></i></div><span id="nR"></span>
         <span>Profondeur des mains</span><div class="m"><i id="mP"></i></div><span id="nP"></span>
-        <span>Accroupi</span><div class="m"><i id="mC"></i></div><span id="nC"></span>
       </div>
       <p class="note" id="lat"></p>
     </div>
@@ -75,118 +74,57 @@
         <thead><tr><th>Geste</th><th>Ce qu'on entend à cette place</th><th>Vu</th></tr></thead>
         <tbody id="tab"></tbody>
       </table>
-      <p class="note">La hauteur de la main choisit la note : aux hanches le grave, au-dessus de la tête l'aigu, toujours dans la gamme du pays. Plus le geste est vif, plus le son est fort. Sans geste, aucun son. Les touches <kbd>1</kbd> à <kbd>8</kbd> jouent chaque geste sans caméra, pour écouter les sons seuls.</p>
+      <p class="note">C'est le mouvement des bras qui joue : chaque bras qui monte, descend ou file de côté fait sonner des notes tout au long du geste, et pas seulement à l'arrivée. La hauteur de la main choisit la note, toujours dans la gamme du pays. Le bras gauche joue une octave plus bas que le droit : deux bras, deux voix. Plus le geste est vif, plus le son est fort. Sans mouvement, aucun son. Les touches <kbd>1</kbd> à <kbd>9</kbd> jouent chaque geste sans caméra, pour écouter les sons seuls.</p>
       <p class="note">« Pousser vers l'avant » repose sur une profondeur estimée par la caméra : c'est le geste le moins sûr. La jauge « Profondeur des mains » montre ce que la caméra en perçoit.</p>
     </div>
   </div>
 </main>
 
 <script type="module">
-import { initLab } from './js/music.js';
+import { initLab, PRESETS, SCALES } from './js/music.js';
+import { settings } from './js/state.js';
 import { Gestes, GESTES } from './js/gestes.js';
 
 const $ = (id) => document.getElementById(id);
 const VER = '0.10.14', CDN = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${VER}`;
 const MODEL = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
 const ROLES = ['Rythme (gauche)', 'Harmonie (centre)', 'Chant (droite)'];
-const SUSTAIN = { violin: 1, bansuri: 1, shakuhachi: 1, ney: 1 };
-const BPM = 108;
 
 // Ce que chaque geste donne, par place. Sert de légende et de référence pour la version de scène.
 const LEGEND = {
-  frapper: ['Une frappe : grave si la main est basse, médium à hauteur de poitrine, claire en haut', 'Une note : la hauteur de la main la choisit', 'Une note piquée, ou une note appuyée sur un instrument tenu'],
+  monter: ['Des frappes médium, tant que le bras monte', 'La mélodie monte avec la main, note après note', 'La mélodie monte avec la main (note tenue qui suit la main au violon et à la flûte)'],
+  descendre: ['Des frappes graves, tant que le bras descend', 'La mélodie descend avec la main', 'La mélodie descend avec la main'],
+  balayer: ['Des frappes claires et légères', 'Deux notes ensemble : vers l\'aigu à droite, vers le grave à gauche', 'Deux notes ensemble, ou un son qui s\'élargit sur un instrument tenu'],
+  frapper: ['Un accent à l\'arrêt du geste : grave, médium ou clair selon la hauteur', 'Une note appuyée à l\'arrêt du geste', 'Une note appuyée'],
   ouvrir: ['Un roulement qui s\'ouvre et éclate', 'Un accord égrené, large', 'La note bondit à l\'octave et s\'épanouit'],
   refermer: ['Une claque sèche', 'Deux notes étouffées, très courtes', 'La note se coupe net'],
-  pousser: ['Un coup profond, le plus grave', 'La note fondamentale, grave et longue', 'Un appel : petite note d\'élan puis note longue'],
-  balayer: ['Un chapelet de frappes légères', 'Un arpège qui monte ou descend avec la main', 'Un glissé de note en note'],
   lever: ['Un roulement qui accélère jusqu\'au coup final', 'Une gamme qui file vers l\'aigu', 'La note la plus haute, tenue'],
-  accroupir: ['Tout descend d\'un cran dans le grave tant qu\'on reste bas', 'Tout joue une octave plus bas tant qu\'on reste bas', 'Tout joue une octave plus bas tant qu\'on reste bas'],
   sauter: ['Grand coup des deux mains', 'Accord plaqué', 'Trait rapide vers l\'aigu'],
+  pousser: ['Un coup profond, le plus grave', 'La note fondamentale, grave et longue', 'Un appel : petite note d\'élan puis note longue'],
 };
 
-let L = null, ch = null, preset = 'geneve', role = 0, snap = false, counts = {}, lastBig = 0, susAt = 0, sweepDeg = 0, low = false;
+
+let L = null, preset = 'geneve', role = 0, counts = {}, lastBig = 0;
 const G = new Gestes();
 
-// ---------- Sons ----------
-const inst = () => L.PRESETS[preset].insts[role];
-const scale = () => { const P = L.PRESETS[preset], iv = L.SCALES[P.scale].iv; return { iv, n: iv.length, base: 36 + P.key }; };
+// ---------- Sons : exactement les fonctions de la scène ----------
+const inst = () => PRESETS[preset].insts[role];
 function setup() {
-  if (!L) return;
-  const def = L.INST[inst()], now = L.ac.currentTime;
-  if (ch.viol) { const v = ch.viol; ch.viol = null; v.g.gain.setTargetAtTime(0, now, 0.05); v.nodes.forEach((n) => { try { n.stop(now + 1); } catch { /* déjà arrêté */ } }); }
-  ch.level.gain.setTargetAtTime(def.level, now, 0.05); ch.rv.gain.setTargetAtTime(def.rev * 1.2, now, 0.1); ch.dl.gain.setTargetAtTime(def.dly, now, 0.1);
-  ch.filt.frequency.setTargetAtTime(16000, now, 0.05);
+  const P = PRESETS[preset];
+  settings.preset = preset; settings.scale = P.scale; settings.key = P.key;      // la gamme du pays (rien n'est sauvegardé depuis cette page)
+  if (L) L.use(role, inst());
 }
-// L'instant où le son part : tout de suite, ou au prochain temps si le calage est demandé.
-function when() {
-  const now = L.ac.currentTime + 0.004;
-  if (!snap) return now;
-  const g = 60 / BPM / 4;
-  return Math.ceil(now / g) * g;
-}
-const degOf = (h) => { const { n } = scale(); return Math.round(h * (2 * n - 1)) - (low ? n : 0); };
-function tone(deg, v, len, t) {
-  const id = inst(), def = L.INST[id], { iv, n, base } = scale(), d = ch.in;
-  const f = (oct) => L.mtof(L.deg2midi(deg, base + oct, iv));
-  if (id === 'piano') L.v.pianoNote(t, f(24), 0.55 * v, d, 0.3 + len * 0.6);
-  else if (id === 'violin') L.v.violinNote(ch, t, f(24), 0.3 * v, len);
-  else if (id === 'bass') L.v.bassNote(t, f(12), 0.9 * v, d, Math.min(0.5, len));
-  else if (def.one) def.one({ t, d, c: ch, sd: len / 3, lvl: 1, s16: 1, climax: true, r: 0, n, iv, base, oct: 0 }, f(def.oct), v);
-}
-function stroke(lv, v, t) {      // lv : 0 grave, 1 médium, 2 clair
-  const id = inst(), def = L.INST[id], d = ch.in, { iv, base } = scale();
-  if (low && lv > 0) lv--;
-  if (id === 'drums') { if (lv === 0) L.v.kick(t, 0.95 * v, d, false); else if (lv === 1) L.v.snare(t, 0.55 * v, d); else L.v.hat(t, 0.3 * v, d, true); }
-  else if (id === 'congas') {
-    if (lv === 0) L.v.drum(t, L.mtof(L.deg2midi(0, base + 12, iv)), 0.6 * v, d, 0.13);
-    else if (lv === 1) L.v.drum(t, L.mtof(L.deg2midi(2, base + 12, iv)), 0.55 * v, d, 0.09);
-    else L.v.tap(t, 0.6 * v, d, 2600, 0.9, 0.02);
-  } else if (def.strokes) {
-    const keys = [def.pats.u[0], def.pats.u[1], def.pats.g], key = keys[lv] in def.strokes ? keys[lv] : keys[1];
-    def.strokes[key]({ t, d, base }, v);
-  }
-}
-function cut(t) { if (ch.viol) { ch.viol.g.gain.cancelScheduledValues(t); ch.viol.g.gain.setTargetAtTime(0, t, 0.02); ch.viol.end = -1; } }
-
-function play(e) {
-  if (!L) return;
-  const t = when(), v = e.v ?? 0.7, { n } = scale(), deg = degOf(e.h ?? 0.4), sus = SUSTAIN[inst()];
-  if (role === 0) {
-    const lv = (e.h ?? 0.4) < 0.24 ? 0 : (e.h ?? 0.4) < 0.5 ? 1 : 2;
-    if (e.type === 'frapper') stroke(lv, v, t);
-    else if (e.type === 'ouvrir') { for (let i = 0; i < 5; i++) stroke(1, 0.35 + 0.13 * i, t + [0, 0.07, 0.13, 0.18, 0.22][i]); stroke(2, 1, t + 0.26); if (inst() === 'drums') L.v.crash(t + 0.26, 0.4, ch.in); else stroke(0, 0.9, t + 0.26); }
-    else if (e.type === 'refermer') { stroke(2, 1, t); L.v.tap(t, 0.5, ch.in, 3200, 1.2, 0.015); }
-    else if (e.type === 'pousser') { stroke(0, 1, t); L.v.thump(t, 46, 1, ch.in, 0.4, 900); }
-    else if (e.type === 'balayer') stroke(2, 0.4 + 0.3 * v, t);
-    else if (e.type === 'lever') { let tt = t; for (let i = 0; i < 9; i++) { stroke(i % 2, 0.3 + 0.07 * i, tt); tt += 0.12 - 0.008 * i; } stroke(0, 1, tt); stroke(2, 1, tt); }
-    else if (e.type === 'accroupir') stroke(0, 0.8, t);
-    else if (e.type === 'sauter') { stroke(0, 1, t); stroke(2, 1, t); stroke(1, 0.8, t + 0.09); }
-    return;
-  }
-  if (e.type === 'frapper') tone(deg, v, sus ? 0.7 : 0.5, t);
-  else if (e.type === 'ouvrir') { if (sus) tone(deg + n, 1, 1.2, t); else [0, 2, 4, n].forEach((k, i) => tone(deg + k, 0.6 + 0.1 * i, 0.9, t + i * 0.035)); }
-  else if (e.type === 'refermer') { if (sus) cut(t); else { tone(deg, 0.8, 0.1, t); tone(deg + n, 0.6, 0.1, t + 0.07); } }
-  else if (e.type === 'pousser') { if (role === 2) { tone(deg - 1, 0.7, 0.1, t); tone(deg, 1, 1, t + 0.09); } else tone(-n, 1, 1.2, t); }
-  else if (e.type === 'balayer') { if (e.first) sweepDeg = deg; else sweepDeg += e.dir; tone(sweepDeg, 0.5 + 0.3 * v, sus ? 0.25 : 0.4, t); }
-  else if (e.type === 'lever') { if (role === 2 && sus) tone(2 * n - 1, 1, 1.5, t); else for (let i = 0; i < 6; i++) tone(deg - 5 + i + 3, 0.5 + 0.08 * i, i === 5 ? 1 : 0.2, t + i * 0.06); }
-  else if (e.type === 'accroupir') tone(-n, 0.8, 0.8, t);
-  else if (e.type === 'sauter') { if (role === 2) for (let i = 0; i < 6; i++) tone(deg + i, 0.6 + 0.06 * i, i === 5 ? 0.8 : 0.15, t + i * 0.045); else [-n, 0, 2, 4, n].forEach((k, i) => tone(deg + k, 0.8, 1, t + i * 0.008)); }
-}
-// Instrument tenu (violon, flûtes) : tant que la main bouge, la note suit sa hauteur. La main s'arrête, la note s'éteint.
-function sustain(c, now) {
-  if (!L || role !== 2 || !SUSTAIN[inst()] || c.still) return;
-  const i = c.speed[0] > c.speed[1] ? 0 : 1, s = c.speed[i];
-  if (s < 1.1 || now - susAt < 0.09) return;
-  susAt = now;
-  tone(degOf(c.h[i]), Math.min(1, 0.35 + s / 9), 0.24, L.ac.currentTime + 0.004);
-}
+function play(e) { if (L) L.gesture(role, inst(), e); }
+function sustain(c) { if (L) L.sustain(role, inst(), { gh: c.h, gspeed: c.speed, gstill: c.still }); }
+const degOf = (h) => Math.round(h * (2 * SCALES[PRESETS[preset].scale].iv.length - 1));
+const scale = () => ({ iv: SCALES[PRESETS[preset].scale].iv, base: 36 + PRESETS[preset].key });
 
 // ---------- Affichage ----------
 function show(e) {
   counts[e.type] = (counts[e.type] || 0) + 1;
   const row = document.querySelector(`tr[data-g="${e.type}"]`);
   if (row) { row.classList.add('hit'); row.lastElementChild.textContent = counts[e.type]; setTimeout(() => row.classList.remove('hit'), 380); }
-  $('big').textContent = GESTES[e.type]; $('big').classList.remove('fade'); $('what').textContent = LEGEND[e.type][role]; lastBig = performance.now();
+  $('big').textContent = GESTES[e.type] + (TRACE[e.type] && e.two ? ' (deux bras)' : ''); $('big').classList.remove('fade'); $('what').textContent = LEGEND[e.type][role]; lastBig = performance.now();
 }
 function legend() {
   $('tab').innerHTML = Object.keys(GESTES).map((g, i) => `<tr data-g="${g}"><td><kbd>${i + 1}</kbd>${GESTES[g]}</td><td>${LEGEND[g][role]}</td><td class="n">${counts[g] || ''}</td></tr>`).join('');
@@ -199,11 +137,11 @@ function seg(el, names, get, set) {
 }
 const NOTE = ['do', 'do♯', 'ré', 'mi♭', 'mi', 'fa', 'fa♯', 'sol', 'la♭', 'la', 'si♭', 'si'];
 function noteName(h) { if (!L) return ''; const { iv, base } = scale(); return NOTE[((L.deg2midi(degOf(h), base, iv) % 12) + 12) % 12]; }
+const TRACE = { monter: 1, descendre: 1, balayer: 1 };
 function meters(c) {
   $('mL').style.width = `${c.h[0] * 100}%`; $('mR').style.width = `${c.h[1] * 100}%`;
   $('nL').textContent = role ? noteName(c.h[0]) : ''; $('nR').textContent = role ? noteName(c.h[1]) : '';
   $('mP').style.width = `${Math.max(0, Math.min(1, -c.push / 2.5)) * 100}%`; $('nP').textContent = c.push.toFixed(1);
-  $('mC').style.width = `${c.crouch * 100}%`; $('nC').textContent = c.low ? 'grave' : '';
 }
 
 // ---------- Caméra et suivi ----------
@@ -227,8 +165,7 @@ function loop(now) {
     lastT = now; frames++;
     const p = res.landmarks?.[0] || null;
     for (const e of G.step(p, dt)) { play(e); show(e); }
-    low = G.cont.low;
-    if (p) { sustain(G.cont, now / 1000); meters(G.cont); }
+    if (p) { sustain(G.cont); meters(G.cont); }
     skeleton(p);
     $('msg').style.display = p ? 'none' : '';
     if (!p) $('msg').textContent = 'Personne en vue. Reculez pour être visible de la tête aux hanches.';
@@ -239,7 +176,7 @@ function loop(now) {
 
 async function start() {
   $('go').disabled = true; $('go').textContent = 'Démarrage…';
-  L = await initLab(); ch = L.chan[0]; setup();
+  L = await initLab(); setup();
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 30 } } });
     $('v').srcObject = stream; await $('v').play();
@@ -250,7 +187,7 @@ async function start() {
     try { tracker = await PoseLandmarker.createFromOptions(files, opt('GPU')); } catch { tracker = await PoseLandmarker.createFromOptions(files, opt('CPU')); }
     $('go').textContent = 'Caméra et son actifs';
   } catch (e) {
-    $('msg').textContent = 'Caméra ou suivi indisponible. Le son fonctionne : essayez les touches 1 à 8.';
+    $('msg').textContent = 'Caméra ou suivi indisponible. Le son fonctionne : essayez les touches 1 à 9.';
     $('go').textContent = 'Son actif (sans caméra)';
   }
 }
@@ -259,16 +196,19 @@ seg($('pays'), ['Genève', 'Mali', 'Inde', 'Japon', 'Levant', 'Caraïbes'], () =
 seg($('role'), ROLES, () => role, (i) => { role = i; });
 legend();
 $('go').onclick = start;
-$('snap').onclick = () => { snap = !snap; $('snap').textContent = `Calage sur la pulsation : ${snap ? 'oui' : 'non'}`; $('snap').classList.toggle('on', snap); };
+let snap = false;
+$('snap').onclick = () => { snap = !snap; settings.snap = snap; $('snap').textContent = `Calage sur la pulsation : ${snap ? 'oui' : 'non'}`; $('snap').classList.toggle('on', snap); };
 addEventListener('keydown', async (ev) => {
   const i = +ev.key - 1, g = Object.keys(GESTES)[i];
   if (!g) return;
-  if (!L) { L = await initLab(); ch = L.chan[0]; setup(); }
-  const e = { type: g, v: 0.8, h: 0.2 + 0.5 * Math.random(), dir: 1, first: true };
-  if (g === 'balayer') { play(e); show(e); for (let k = 1; k < 5; k++) setTimeout(() => play({ ...e, first: false }), k * 70); return; }
+  if (!L) { L = await initLab(); setup(); }
+  const h0 = 0.25 + 0.4 * Math.random(), e = { type: g, v: 0.8, h: h0, dir: 1, hand: 1 };
+  // Les gestes continus sont joués comme un vrai mouvement : plusieurs crans de suite.
+  if (TRACE[g]) { show(e); for (let k = 0; k < 6; k++) setTimeout(() => play({ ...e, v: 0.6, h: h0 + (g === 'monter' ? k : g === 'descendre' ? -k : 0) / 12 }), k * 90); return; }
   play(e); show(e);
 });
 requestAnimationFrame(loop);
+settings.snap = false;
 window.__atelier = { play, set: (p, r) => { preset = p; role = r; setup(); legend(); }, lab: () => L };
 </script>
 </body>

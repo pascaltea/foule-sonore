@@ -3,8 +3,8 @@
 // Unité de mesure : la longueur du torse, pour que les gestes comptent pareil de près comme de loin.
 const clamp = (v, a = 0, b = 1) => (v < a ? a : v > b ? b : v);
 export const GESTES = {
-  frapper: 'Frapper', ouvrir: 'Ouvrir les bras', refermer: 'Refermer les mains', pousser: 'Pousser vers l\'avant',
-  balayer: 'Balayer', lever: 'Lever les deux mains', accroupir: 'S\'accroupir', sauter: 'Sauter',
+  monter: 'Monter un bras', descendre: 'Descendre un bras', balayer: 'Balayer de côté', frapper: 'Frapper',
+  ouvrir: 'Ouvrir les bras', refermer: 'Refermer les mains', lever: 'Lever les deux mains', sauter: 'Sauter', pousser: 'Pousser vers l\'avant',
 };
 const SH = [11, 12], WR = [15, 16], HIP = [23, 24], NJ = 33;
 
@@ -13,10 +13,10 @@ export class Gestes {
   constructor(aspect = 16 / 9, mirror = false) {
     this.A = aspect; this.M = mirror ? -1 : 1; this.fresh = true; this.torso = 0.15;
     this.p = Array.from({ length: NJ }, () => ({ x: 0, y: 0, z: 0, vx: 0, vy: 0, vis: 0 }));
-    this.hand = [0, 1].map(() => ({ peak: 0, arm: false, col: 0, sweep: false, cool: 0 }));
+    this.hand = [0, 1].map(() => ({ peak: 0, arm: false, cool: 0, gap: 0 }));
     this.D = 1; this.dD = 0; this.canOpen = true; this.canClose = false; this.canUp = true; this.canPush = true;
-    this.pz = 0; this.dpz = 0; this.base = null; this.low = false; this.jumpAge = 9; this.block = 0; this.quiet = 0;
-    this.cont = { h: [0, 0], speed: [0, 0], open: 0, low: false, still: true, push: 0, crouch: 0, seen: false };
+    this.pz = 0; this.dpz = 0; this.jumpAge = 9; this.block = 0; this.quiet = 0;
+    this.cont = { h: [0, 0], speed: [0, 0], open: 0, still: true, push: 0, seen: false };
   }
 
   // lm : 33 points {x, y, z, visibility} en coordonnées d'image (0 à 1). Renvoie les gestes reconnus sur cette image.
@@ -77,9 +77,9 @@ export class Gestes {
 
     // Chaque main : frappe (vers le bas, sèche) ou balayage (de côté).
     for (let i = 0; i < 2; i++) {
-      const k = WR[i], H = this.hand[i], o = this.hand[1 - i];
+      const k = WR[i], H = this.hand[i];
       H.cool = Math.max(0, H.cool - dt);
-      if (!vis(k)) { H.arm = false; H.sweep = false; continue; }
+      if (!vis(k)) { H.arm = false; H.row = undefined; continue; }
       const vx = P[k].vx * A / T, vy = P[k].vy / T, other = c.speed[1 - i];
       // Frappe : la main descend vite puis s'arrête net. Le son part à l'arrêt, comme une baguette sur une peau.
       if (!this.block && vy > 3 && vy > Math.abs(vx) * 0.8) { H.arm = true; H.peak = Math.max(H.peak, vy); }
@@ -87,27 +87,21 @@ export class Gestes {
         if (!this.block && !H.cool) ev.push({ type: 'frapper', hand: i, v: clamp(0.25 + (H.peak - 3) / 10), h: c.h[i], x: P[k].x });
         H.arm = false; H.peak = 0; H.cool = 0.11;
       }
-      // Balayage : une main file de côté pendant que l'autre reste calme ; une note à chaque cran franchi.
-      const side = Math.abs(vx) > 3.5 && Math.abs(vx) > 1.6 * Math.abs(vy) && other < 2.5 && !this.block && !o.sweep;
-      const col = Math.floor(P[k].x * A / T / 0.4);
-      if (side) {
-        if (H.sweep && col !== H.col) ev.push({ type: 'balayer', hand: i, dir: (vx < 0 ? 1 : -1) * this.M, v: clamp(Math.abs(vx) / 12, 0.3, 1), h: c.h[i], first: false });
-        else if (!H.sweep) ev.push({ type: 'balayer', hand: i, dir: (vx < 0 ? 1 : -1) * this.M, v: clamp(Math.abs(vx) / 12, 0.3, 1), h: c.h[i], first: true });
-        H.sweep = true; H.arm = false; H.peak = 0;
-      } else if (Math.abs(vx) < 2) H.sweep = false;
-      H.col = col;
+      // Le mouvement lui-même joue : chaque fois que la main franchit un cran, vers le haut, vers le bas ou de côté,
+      // un son part. Le sens du mouvement, la main (gauche ou droite) et le fait de bouger les deux bras comptent.
+      const row = Math.floor(c.h[i] * 12), col = Math.floor(P[k].x * A / T / 0.42), spd = c.speed[i];
+      H.gap = Math.max(0, (H.gap || 0) - dt);
+      if (H.row === undefined) { H.row = row; H.col = col; }
+      if (spd > 0.7 && !this.block && !H.gap) {
+        const two = other > 1.2, v = clamp(0.2 + spd / 11, 0.2, 0.85);
+        if (row !== H.row && Math.abs(vy) >= Math.abs(vx) * 0.7) { ev.push({ type: row > H.row ? 'monter' : 'descendre', hand: i, two, v, h: c.h[i] }); H.gap = 0.085; }
+        else if (col !== H.col && Math.abs(vx) > Math.abs(vy) * 0.7) { ev.push({ type: 'balayer', hand: i, two, dir: (vx < 0 ? 1 : -1) * this.M, v, h: c.h[i] }); H.gap = 0.085; }
+      }
+      if (!H.gap || spd <= 0.7) { H.row = row; H.col = col; }
     }
 
-    // S'accroupir : les hanches descendent sous leur hauteur habituelle. Tant qu'on reste bas, tout joue plus grave.
-    if (vis(23) && vis(24)) {
-      if (this.base === null || hy < this.base) this.base = hy; else this.base += (hy - this.base) * dt * 0.03;
-      c.crouch = clamp((hy - this.base) / T / 0.5);
-      if (!this.low && c.crouch > 0.75) { this.low = true; ev.push({ type: 'accroupir', v: 0.8, h: 0 }); }
-      if (this.low && c.crouch < 0.4) this.low = false;
-      // Sauter : les hanches montent d'un coup.
-      if (mid(HIP, 'vy') / T < -1.8 && this.jumpAge > 0.8 && !this.low) { this.jumpAge = 0; ev.push({ type: 'sauter', v: 1, h: (c.h[0] + c.h[1]) / 2 }); }
-    }
-    c.low = this.low;
+    // Sauter : les hanches montent d'un coup.
+    if (vis(23) && vis(24) && mid(HIP, 'vy') / T < -1.8 && this.jumpAge > 0.8) { this.jumpAge = 0; ev.push({ type: 'sauter', v: 1, h: (c.h[0] + c.h[1]) / 2 }); }
     return ev;
   }
 }

@@ -118,14 +118,16 @@ Chaque geste joue un son, rejouable à l'identique. La hauteur de la main choisi
 
 | Geste | Rythme (gauche) | Harmonie (centre) | Chant (droite) |
 |---|---|---|---|
-| Frapper | frappe grave, médium ou claire selon la hauteur | une note | note piquée ou appuyée |
+| Monter un bras | frappes médium tout au long du geste | la mélodie monte avec la main | idem (note tenue qui suit la main au violon et à la flûte) |
+| Descendre un bras | frappes graves tout au long du geste | la mélodie descend avec la main | idem |
+| Balayer de côté | frappes claires et légères | deux notes ensemble, vers l'aigu à droite, vers le grave à gauche | idem, ou son qui s'élargit |
+| Frapper (arrêt net) | accent grave, médium ou clair selon la hauteur | note appuyée | note appuyée |
 | Ouvrir les bras | roulement qui éclate | accord égrené | la note bondit à l'octave |
 | Refermer les mains | claque sèche | deux notes étouffées | la note se coupe |
-| Balayer | chapelet de frappes légères | arpège qui suit la main | glissé de note en note |
 | Lever les deux mains | roulement qui accélère | gamme vers l'aigu | note la plus haute, tenue |
 | Sauter | grand coup | accord plaqué | trait rapide |
 
-Violon et flûtes : la note suit la main tant qu'elle bouge. « Pousser vers l'avant » et « s'accroupir » existent dans `js/gestes.js` mais ne sont pas actifs en scène (`settings.gestes`).
+C'est le mouvement des bras qui joue, pas seulement la position d'arrivée : des sons partent tout au long du geste. Le bras gauche joue une octave plus bas que le droit (deux bras, deux voix). « Pousser vers l'avant » existe dans `js/gestes.js` mais n'est pas joué en scène (`settings.gestesOff`).
 
 - **Secours** (réglages `H` ou régie) : décocher « Jeu par gestes » ramène l'ancienne partition guidée par le mouvement ; « Calage sur une pulsation » aligne chaque son sur un temps commun.
 - **Atelier** : `atelier.html` permet d'essayer chaque geste seul, avec le geste reconnu affiché.
