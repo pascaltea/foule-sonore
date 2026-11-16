@@ -1,10 +1,11 @@
 // Métriques de foule (0..1, lissées) et dramaturgie collective.
-import { GW, GH, GN, MAX_SECTORS, state, settings, clamp, smooth } from './state.js';
+import { GW, GH, GN, MAX_SECTORS, state, settings, trio, clamp, smooth } from './state.js';
 
 const SPEED_REF = 9;            // cellules/s considérées comme « rapide » (foule filmée de loin)
 const HN = 480;                 // 8 s d'historique à 60 Hz pour la pulsation
 const hist = new Float32Array(HN), buf = new Float32Array(HN);
 let hPos = 0, hAcc = 0, pulseT = 0, eFast = 0, eSlow = 0;
+const heldT = [0, 0, 0, 0];     // depuis combien de temps on n'a plus vu jouer au moins k personnes
 const NS = MAX_SECTORS;
 const za = new Float32Array(NS), zx = new Float32Array(NS), zy = new Float32Array(NS), zm = new Float32Array(NS), zc = new Float32Array(NS);
 
@@ -68,6 +69,10 @@ export function updateMetrics(dt) {
     const ge = n ? se / n : 0;
     m.energy = Math.max(m.energy, ge);
     m.coherence = smooth(m.coherence, n && ge > 0.06 ? clamp(0.3 + 0.7 * on / n) : 0, dt, 0.7, 1.4);
+    // Nombre de personnes qui jouent, tenu 2 s : reprendre son souffle ne fait pas retomber la Créature.
+    let held = 0;
+    for (let k = 1; k <= 3; k++) { heldT[k] = on >= k ? 0 : heldT[k] + dt; if (heldT[k] < 2) held = k; }
+    m.playing = held;
   }
 
   // Événements : pic soudain et immobilité.
@@ -126,7 +131,11 @@ export function updateDrama(dt) {
   if (d.phase === 'build') {
     // Bouger ne suffit pas : c'est bouger ensemble qui remplit la jauge.
     const coop = m.energy * (0.1 + 0.9 * m.coherence * m.coherence);
-    d.gauge = clamp(d.gauge + dt * k * (0.024 * coop - 0.004 - 0.006 * (1 - m.energy)));
+    const next = clamp(d.gauge + dt * k * (0.024 * coop - 0.004 - 0.006 * (1 - m.energy)));
+    // Scène à trois : chaque personne qui joue ouvre un étage de plus. Seul, on éveille la Créature ;
+    // à deux, elle se lève ; il faut être trois pour la faire rayonner.
+    const cap = trio() ? [0.12, 0.34, 0.64, 1][m.playing] : 1;
+    d.gauge = next <= cap ? next : Math.max(cap, Math.min(next, d.gauge - dt * 0.05));
     if (d.gauge >= 1) { d.phase = 'climax'; d.phaseT = 0; d.tierUps++; }
   } else if (d.phase === 'climax') {
     d.gauge = 1;

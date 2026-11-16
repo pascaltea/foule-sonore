@@ -1,7 +1,7 @@
 // Mode « petit groupe » : suivi du corps de 1 à 5 personnes (MediaPipe Pose), ou silhouettes simulées.
 // Chaque personne suivie occupe un emplacement stable (0..4) auquel la régie associe un instrument.
 // Les images sont analysées sur place : rien n'est enregistré ni envoyé.
-import { GW, GH, MAX_PLAYERS, state, settings, clamp, smooth, rebuildSectorMap } from './state.js';
+import { GW, GH, MAX_PLAYERS, ZONES, state, settings, trio, clamp, smooth, rebuildSectorMap } from './state.js';
 import { video, splat, simJumping } from './capture.js';
 
 const VER = '0.10.14', CDN = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${VER}`;
@@ -40,9 +40,41 @@ export function load() {
 
 const mid = (p, a, b, k) => (p[a][k] + p[b][k]) / 2;
 
+const drop = (s) => { s.on = false; s.tE = s.tS = s.tC = 0; };
+export function reset() { slots.forEach((s) => { drop(s); s.lost = 0; s.fresh = true; }); }
+
+// Scène à trois : l'emplacement n'est plus l'ordre d'arrivée mais la place occupée (0 gauche, 1 centre, 2 droite).
+// Changer de place, c'est changer d'instrument. Une petite marge évite de basculer en restant sur une frontière ;
+// si deux personnes partagent une place, la plus centrée joue.
+const EDGE = 0.035;
+function ingestZones(cs, dt) {
+  const best = new Array(ZONES).fill(null);
+  for (const c of cs) {
+    let z = clamp(Math.floor(c.x * ZONES), 0, ZONES - 1), prev = -1, pd = 0.25;
+    for (let i = 0; i < ZONES; i++) {
+      const s = slots[i];
+      if (!s.on) continue;
+      const d = Math.hypot((c.x - s.cx) * ASPECT, c.y - s.cy);
+      if (d < pd) { pd = d; prev = i; }
+    }
+    if (prev >= 0 && prev !== z && c.x > prev / ZONES - EDGE && c.x < (prev + 1) / ZONES + EDGE) z = prev;
+    c.same = prev === z;
+    c.off = Math.abs(c.x - (z + 0.5) / ZONES);
+    if (!best[z] || c.off < best[z].off) best[z] = c;
+  }
+  slots.forEach((s, i) => {
+    const c = i < ZONES ? best[i] : null;
+    if (!c) { s.lost += dt; if (s.on && s.lost > 0.6) drop(s); return; }
+    if (!s.on || !c.same) s.fresh = true;       // nouvelle personne à cette place : on repart de ses gestes à elle
+    s.on = true;
+    track(s, c, dt);
+  });
+}
+
 // Reçoit les poses d'une image (points normalisés 0..1, déjà en miroir) et les rattache aux emplacements.
 function ingest(poses, dt) {
   const cs = poses.map((p) => ({ p, x: (mid(p, 11, 12, 'x') + mid(p, 23, 24, 'x')) / 2, y: (mid(p, 11, 12, 'y') + mid(p, 23, 24, 'y')) / 2, slot: -1 }));
+  if (trio()) { ingestZones(cs, dt); return; }
   // Appariement glouton par proximité : une personne garde son emplacement tant qu'elle reste suivie.
   const pairs = [];
   slots.forEach((s, i) => { if (s.on) cs.forEach((c, j) => { const d = Math.hypot((c.x - s.cx) * ASPECT, c.y - s.cy); if (d < 0.35) pairs.push([d, i, j]); }); });
@@ -58,7 +90,7 @@ function ingest(poses, dt) {
   slots.forEach((s, i) => {
     if (taken.has(i)) return;
     s.lost += dt;
-    if (s.on && s.lost > 0.6) { s.on = false; s.tE = s.tS = s.tC = 0; }
+    if (s.on && s.lost > 0.6) drop(s);
   });
   for (const c of cs) if (c.slot >= 0) track(slots[c.slot], c, dt);
 }
@@ -113,7 +145,7 @@ function figure(cx, top, T, aL, aR, hand) {
 
 function simPoses(t) {
   const p = settings.simPreset, T = 0.17, top = 0.36, out = [], jump = simJumping() ? -0.6 * T : 0;
-  const n = [1, 1, 2, 3, 5, 5][p] ?? 1, tw = 6.283;
+  const n = Math.min(trio() ? ZONES : MAX_PLAYERS, [1, 1, 2, 3, 5, 5][p] ?? 1), tw = 6.283;
   const turn = settings.simSector >= 0 ? settings.simSector % n : Math.floor(t / 6) % n;
   for (let j = 0; j < n; j++) {
     let cx = (j + 0.5) / n, y = top + jump, aL = 0.3, aR = 0.3, hand = null;

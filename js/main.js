@@ -5,9 +5,12 @@ import * as pose from './pose.js';
 import { updateMetrics, updateDrama } from './metrics.js';
 import * as music from './music.js';
 import * as visuals from './visuals.js';
+import * as creature from './creature.js';
 import * as ui from './ui.js';
 
 let last = performance.now(), lowT = 0, highT = 0, glOk = true;
+
+creature.init(document.getElementById('creature'));
 
 try { visuals.init(document.getElementById('stage')); }
 catch (e) { glOk = false; ui.note('WebGL indisponible : visuels désactivés, la musique fonctionne.', 0); }
@@ -31,7 +34,7 @@ async function useCamera() {
 async function usePose() {
   if (settings.mode !== 'group' || settings.simulate || pose.status.ready) return;
   ui.note('Chargement du suivi du corps…', 0);
-  try { await pose.load(); ui.note('Suivi du corps prêt : placez-vous face à la caméra, corps entier visible.', 6000); }
+  try { await pose.load(); ui.note(settings.zones ? 'Suivi du corps prêt : une personne par place, face à la caméra, corps entier visible.' : 'Suivi du corps prêt : placez-vous face à la caméra, corps entier visible.', 6000); }
   catch { ui.note(pose.status.error + ' : essayez la simulation ou le mode Foule.', 10000); }
 }
 
@@ -64,6 +67,7 @@ function pipeline(dt, t) {
   updateDrama(dt);
   music.update(dt);
   if (glOk) visuals.render(dt, t);
+  creature.render(dt, t);
   ui.update();
 }
 

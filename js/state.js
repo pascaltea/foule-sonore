@@ -1,7 +1,10 @@
 // État partagé : captation -> métriques -> dramaturgie -> musique -> visuels.
 export const GW = 64, GH = 36, GN = GW * GH;
 export const MAX_SECTORS = 6;
-export const SECTOR_COLORS = ['#ff5a36', '#ffc233', '#4cc9ff', '#8dff7a', '#d07bff', '#ff7ab8'];
+// Couleurs de l'Assemblée créative de Genève : les trois titres des affiches, puis leurs trois décors.
+export const SECTOR_COLORS = ['#ffff54', '#ff67ff', '#0ae600', '#0a86c8', '#ff7a0a', '#0a7048'];
+export const ZONES = 3;           // scène à trois : gauche, centre, droite
+export const ZONE_SIDES = ['Gauche', 'Centre', 'Droite'];
 const DEF_INST = ['drums', 'piano', 'violin', 'bass', 'marimba', 'bells'];
 
 // Découpages prédéfinis : rectangles en fractions de l'image [x, y, largeur, hauteur].
@@ -31,7 +34,7 @@ export function sanitizeSectors(arr) {
   return arr.slice(0, MAX_SECTORS).map((s, i) => {
     const x = clamp(Math.round(+s.x || 0), 0, GW - 2), y = clamp(Math.round(+s.y || 0), 0, GH - 2);
     return {
-      name: String(s.name ?? 'Secteur ' + (i + 1)).slice(0, 24),
+      name: String(s.name ?? 'Secteur ' + (i + 1)).slice(0, 28),
       color: /^#[0-9a-f]{6}$/i.test(s.color) ? s.color : SECTOR_COLORS[i],
       inst: String(s.inst || DEF_INST[i]), vol: clamp(+s.vol >= 0 ? +s.vol : 1, 0, 1.5), mute: !!s.mute,
       x, y, w: clamp(Math.round(+s.w || 2), 2, GW - x), h: clamp(Math.round(+s.h || 2), 2, GH - y),
@@ -39,37 +42,42 @@ export function sanitizeSectors(arr) {
   });
 }
 
-const KEY = 'foule-sonore';
+const KEY = 'foule-sonore-acg';
 let saved = {};
 try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { /* stockage indisponible */ }
 
 // Mode « petit groupe » : une personne suivie = un instrument. Le rectangle suit la personne à chaque image.
+// En scène à trois, les trois premiers emplacements sont les places gauche, centre et droite : un panel, un instrument.
 export const MAX_PLAYERS = 5;
+const DEF_PLAYERS = [['Faire émerger & connecter', 'drums'], ['Transmettre', 'piano'], ['Rayonner', 'violin'], ['Personne 4', 'marimba'], ['Personne 5', 'bass']];
 export function sanitizePlayers(arr) {
   return Array.from({ length: MAX_PLAYERS }, (_, i) => {
     const s = (Array.isArray(arr) && arr[i]) || {};
     return {
-      name: String(s.name ?? 'Personne ' + (i + 1)).slice(0, 24),
+      name: String(s.name ?? DEF_PLAYERS[i][0]).slice(0, 28),
       color: /^#[0-9a-f]{6}$/i.test(s.color) ? s.color : SECTOR_COLORS[i],
-      inst: String(s.inst || ['piano', 'drums', 'violin', 'marimba', 'bass'][i]), vol: clamp(+s.vol >= 0 ? +s.vol : 1, 0, 1.5), mute: !!s.mute,
+      inst: String(s.inst || DEF_PLAYERS[i][1]), vol: clamp(+s.vol >= 0 ? +s.vol : 1, 0, 1.5), mute: !!s.mute,
       x: 0, y: 0, w: 0, h: 0, present: false,
     };
   });
 }
 
 export const settings = Object.assign({
-  mode: 'crowd',      // 'crowd' (foule, secteurs fixes) ou 'group' (1 à 5 personnes suivies)
+  mode: 'group',      // 'crowd' (foule, secteurs fixes) ou 'group' (personnes suivies)
+  zones: true,        // en 'group' : scène à trois, l'instrument dépend de la place (gauche, centre, droite)
+  creature: true,     // la Créature des affiches incarne la jauge collective
   cameraId: '',
   sensitivity: 1.3,   // foule large et lointaine : gain un peu relevé par défaut
   scale: 'pentaMin',
   key: 9,             // La
   volume: 0.8,
-  palette: 'braise',
+  palette: 'assemblee',
   debug: false,
-  dramaSpeed: 1,
-  showSectors: false,
-}, saved, { simulate: false, simPreset: 2, simSector: -1 });
-if (settings.mode !== 'group') settings.mode = 'crowd';
+  dramaSpeed: 2,
+  showSectors: true,
+}, saved, { simulate: false, simPreset: 3, simSector: -1 });
+if (settings.mode !== 'crowd') settings.mode = 'group';
+export const trio = () => settings.mode === 'group' && settings.zones;
 // settings.sectors désigne toujours la configuration du mode actif ; celle de l'autre mode attend dans « stash ».
 let stash = settings.mode === 'group' ? sanitizeSectors(saved.sectors) : sanitizePlayers(saved.players);
 settings.sectors = settings.mode === 'group' ? sanitizePlayers(saved.players) : sanitizeSectors(saved.sectors);
@@ -102,7 +110,7 @@ export const state = {
   sec: Array.from({ length: MAX_SECTORS }, newSec),
   capture: { mode: 'off', calibLeft: 0, error: '' },
   m: {
-    energy: 0, energyRaw: 0, speed: 0, dirX: 0, dirY: 0, coherence: 0,
+    energy: 0, energyRaw: 0, speed: 0, dirX: 0, dirY: 0, coherence: 0, playing: 0,
     cx: 0.5, cy: 0.5, dispersion: 0,
     pulseBpm: 0, pulseConf: 0, peakCount: 0, peakAge: 99, stillTime: 0, still: false,
   },

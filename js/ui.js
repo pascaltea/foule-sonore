@@ -1,10 +1,10 @@
 // Régie : panneau de réglages, éditeur de secteurs, raccourcis clavier, jauge, affichage debug.
-import { GW, GH, GN, MAX_SECTORS, SECTOR_COLORS, LAYOUTS, makeLayout, sanitizeSectors, rebuildSectorMap,
-  state, settings, saveSettings, clamp, setMode, configOf, setConfig, sanitizePlayers, playersConfig } from './state.js';
+import { GW, GH, GN, MAX_SECTORS, SECTOR_COLORS, ZONES, ZONE_SIDES, LAYOUTS, makeLayout, sanitizeSectors, rebuildSectorMap,
+  state, settings, saveSettings, clamp, setMode, configOf, setConfig, sanitizePlayers, playersConfig, trio } from './state.js';
 import { SCALES, KEYS, INSTRUMENTS } from './music.js';
 import { PALETTES } from './visuals.js';
 import * as capture from './capture.js';
-import { slots, BONES, status as poseStatus } from './pose.js';
+import { slots, BONES, status as poseStatus, reset as resetPose } from './pose.js';
 
 const $ = (id) => document.getElementById(id);
 let handlers = {}, noteTimer = 0;
@@ -12,6 +12,12 @@ const HL = 360, hE = new Float32Array(HL), hS = new Float32Array(HL), hC = new F
 let hp = 0;
 const CELL = 6, OX = 8, OY = 8;        // géométrie de la grille dans le canvas debug
 let sel = -1, drag = null;
+const modeKey = () => (settings.mode === 'crowd' ? 'crowd' : settings.zones ? 'trio' : 'group');
+const INVITE = {
+  trio: ['Réveillons la Créature', 'Trois places, trois instruments : montez sur scène'],
+  group: ['Réveillons la Créature', 'Bougez, elle vous regarde'],
+  crowd: ['Bougez !', 'Imaginons la Créature ensemble'],
+};
 
 export function note(text, ms = 5000) {
   const n = $('note');
@@ -39,12 +45,17 @@ function sync() {
   $('vDrama').textContent = '×' + settings.dramaSpeed;
   $('dbgOn').checked = settings.debug; $('debug').classList.toggle('on', settings.debug);
   $('sim').checked = settings.simulate; $('simBox').classList.toggle('on', settings.simulate);
-  const group = settings.mode === 'group';
+  const group = settings.mode === 'group', mk = modeKey();
   document.body.classList.toggle('group', group);
-  $('mode').value = settings.mode;
-  document.querySelectorAll('[data-mode]').forEach((b) => b.classList.toggle('active', b.dataset.mode === settings.mode));
+  document.body.classList.toggle('trio', mk === 'trio');
+  $('mode').value = mk;
+  document.querySelectorAll('[data-mode]').forEach((b) => b.classList.toggle('active', b.dataset.mode === mk));
+  $('invite').firstElementChild.textContent = INVITE[mk][0]; $('invite').lastElementChild.textContent = INVITE[mk][1];
+  $('creatureOn').checked = settings.creature;
   document.querySelectorAll('[data-g]').forEach((b) => { b.dataset.c ??= b.textContent; b.textContent = group ? b.dataset.g : b.dataset.c; });
-  $('showSec').checked = settings.showSectors; $('sectors').classList.toggle('on', settings.showSectors);
+  $('showSec').checked = settings.showSectors;
+  $('sectors').classList.toggle('on', settings.showSectors && mk !== 'trio');
+  $('zones').classList.toggle('on', settings.showSectors && mk === 'trio');
   document.querySelectorAll('[data-p]').forEach((b) => b.classList.toggle('active', +b.dataset.p === settings.simPreset));
   document.body.classList.toggle('clean', $('panel').classList.contains('hidden') && !settings.simulate && $('start').classList.contains('hidden'));
   saveSettings();
@@ -56,13 +67,13 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 // Reconstruit la liste de la régie et le calque projeté. À appeler après tout changement de structure.
 function sectorsChanged(rebuildList = true) {
   rebuildSectorMap();
-  const S = settings.sectors;
+  const S = settings.sectors, isTrio = trio();
   if (sel >= S.length) sel = -1;
   if (rebuildList) {
-    $('secList').innerHTML = S.map((s, i) => `
+    $('secList').innerHTML = (isTrio ? S.slice(0, ZONES) : S).map((s, i) => `
       <div class="sec${i === sel ? ' sel' : ''}" data-i="${i}" style="border-left-color:${s.color}">
         <div class="row"><input type="color" data-f="color" value="${s.color}" title="Couleur">
-          <input type="text" data-f="name" value="${esc(s.name)}" maxlength="24" title="Nom">
+          <input type="text" data-f="name" value="${esc(s.name)}" maxlength="28" title="Nom">
           <button data-f="del" title="Supprimer ce secteur">✕</button></div>
         <div class="row"><select data-f="inst" title="Instrument">${Object.entries(INSTRUMENTS).map(([k, l]) =>
           `<option value="${k}"${k === s.inst ? ' selected' : ''}>${l}</option>`).join('')}</select>
@@ -72,6 +83,8 @@ function sectorsChanged(rebuildList = true) {
   }
   $('sectors').innerHTML = S.map((s) => `<div style="left:${s.x / GW * 100}%;top:${s.y / GH * 100}%;width:${s.w / GW * 100}%;height:${s.h / GH * 100}%;
     border-color:${s.color};color:${s.color}"><span>${esc(s.name)} · ${INSTRUMENTS[s.inst] || ''}</span></div>`).join('');
+  // Scène à trois : un bandeau par place, au nom du panel, qui s'allume quand quelqu'un s'y tient.
+  $('zones').innerHTML = isTrio ? S.slice(0, ZONES).map((s, i) => `<div style="color:${s.color}"><em>${ZONE_SIDES[i]}</em><b>${esc(s.name)}</b><span></span></div>`).join('') : '';
   saveSettings();
 }
 
@@ -147,9 +160,9 @@ function deleteSelected() {
 }
 
 // ---------- Export / import de la configuration ----------
-const CFG_KEYS = ['sensitivity', 'scale', 'key', 'volume', 'palette', 'dramaSpeed', 'showSectors'];
+const CFG_KEYS = ['sensitivity', 'scale', 'key', 'volume', 'palette', 'dramaSpeed', 'showSectors', 'zones', 'creature'];
 function exportConfig() {
-  const cfg = { type: 'foule-sonore', version: 3, sectors: configOf('crowd'), players: playersConfig() };
+  const cfg = { type: 'foule-sonore', version: 4, sectors: configOf('crowd'), players: playersConfig() };
   CFG_KEYS.forEach((k) => { cfg[k] = settings[k]; });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([JSON.stringify(cfg, null, 2)], { type: 'application/json' }));
@@ -168,6 +181,9 @@ export function applyConfig(cfg) {
   if (cfg.sensitivity > 0) settings.sensitivity = clamp(+cfg.sensitivity, 0.3, 4);
   if (cfg.dramaSpeed > 0) settings.dramaSpeed = clamp(+cfg.dramaSpeed, 0.25, 6);
   settings.showSectors = !!cfg.showSectors;
+  if ('zones' in cfg) settings.zones = !!cfg.zones;
+  if ('creature' in cfg) settings.creature = !!cfg.creature;
+  resetPose();
   sel = -1;
   $('scale').value = settings.scale; $('key').value = settings.key; $('palette').value = settings.palette;
   $('sens').value = settings.sensitivity; $('vol').value = settings.volume; $('drama').value = settings.dramaSpeed;
@@ -183,10 +199,12 @@ async function importConfig(e) {
 }
 
 export function changeMode(mode) {
-  if (mode !== 'group' && mode !== 'crowd') return;
-  setMode(mode); sel = -1; drag = null;
+  if (!INVITE[mode]) return;
+  if (mode !== 'crowd') settings.zones = mode === 'trio';
+  setMode(mode === 'crowd' ? 'crowd' : 'group'); sel = -1; drag = null;
+  resetPose();
   sectorsChanged(); sync();
-  handlers.onMode?.(mode);
+  handlers.onMode?.(settings.mode);
 }
 export function setSim(v) { settings.simulate = v; handlers.onSim?.(v); sync(); }
 function fullscreen() {
@@ -215,6 +233,7 @@ export function init(h) {
   $('dbgOn').onchange = (e) => { settings.debug = e.target.checked; sync(); };
   $('sim').onchange = (e) => setSim(e.target.checked);
   $('showSec').onchange = (e) => { settings.showSectors = e.target.checked; sync(); };
+  $('creatureOn').onchange = (e) => { settings.creature = e.target.checked; sync(); };
   $('layout').onchange = (e) => { if (e.target.value) { settings.sectors = makeLayout(e.target.value, settings.sectors); sel = -1; sectorsChanged(); } };
   $('secList').addEventListener('input', onSectorInput);
   $('secList').addEventListener('click', onSectorInput);
@@ -331,7 +350,14 @@ export function update() {
   $('gauge').style.opacity = d.attract ? 0.25 : 1;
   $('invite').classList.toggle('on', d.attract && state.music.running);
   if (c.calibLeft > 0) note(`Calibration… ${Math.ceil(c.calibLeft)} s`, 800);
-  if (settings.showSectors) {            // le contour d'un secteur s'allume quand son instrument joue
+  if (settings.showSectors && trio()) {
+    const el = $('zones').children;
+    for (let i = 0; i < el.length; i++) {
+      const q = state.sec[i], s = settings.sectors[i], txt = s.present ? INSTRUMENTS[s.inst] || '' : 'Place libre';
+      el[i].style.opacity = (s.present ? (q.on ? 0.8 : 0.55) : 0.3) + 0.2 * q.pulse;
+      if (el[i].lastElementChild.textContent !== txt) el[i].lastElementChild.textContent = txt;
+    }
+  } else if (settings.showSectors) {            // le contour d'un secteur s'allume quand son instrument joue
     const el = $('sectors').children;
     for (let i = 0; i < el.length; i++) {
       const q = state.sec[i], s = settings.sectors[i];

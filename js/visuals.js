@@ -3,6 +3,7 @@
 import { GW, GH, GN, state, settings, clamp } from './state.js';
 
 export const PALETTES = {
+  assemblee: { label: 'Assemblée créative', c: [[0.04, 0.5, 0.3], [0.04, 0.53, 0.82], [1, 0.48, 0.04]] },
   braise: { label: 'Braise', c: [[1, 0.22, 0.04], [1, 0.62, 0.08], [1, 0.92, 0.55]] },
   aurore: { label: 'Aurore', c: [[0.05, 0.95, 0.7], [0.25, 0.45, 1], [0.95, 0.25, 0.85]] },
   ocean: { label: 'Océan', c: [[0, 0.3, 1], [0, 0.8, 0.9], [0.75, 1, 1]] },
@@ -168,7 +169,7 @@ export function render(dt, t) {
   resize();
   const m = state.m, d = state.drama, mu = state.music;
   const attract = d.attract;
-  const pal = (PALETTES[settings.palette] || PALETTES.braise).c;
+  const pal = (PALETTES[settings.palette] || PALETTES.assemblee).c;
   const q = QUALITY[state.perf.quality];
   const count = Math.floor(MAX * q.n * (attract ? 0.3 : 0.15 + 0.85 * m.energy));
   stepParticles(dt, t, count, attract);
