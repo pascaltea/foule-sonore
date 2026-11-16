@@ -3,7 +3,9 @@ import { GW, GH, GN, MAX_SECTORS, SECTOR_COLORS, ZONES, LAYOUTS, makeLayout, san
   state, settings, saveSettings, clamp, setMode, configOf, setConfig, sanitizePlayers, playersConfig, trio } from './state.js';
 import { SCALES, KEYS, INSTRUMENTS, PRESETS } from './music.js';
 import { endSession, newSession } from './metrics.js';
-import { setNet, netInfo, regieUrl } from './remote.js';
+import { setNet, netInfo, regieUrl, setGallery, galleryInfo, galleryUrl, creatureUrl } from './remote.js';
+import { decode } from './portrait.js';
+import { Living, animate } from './creature-draw.js';
 import { gallery, nextStop, overflow, exportGallery, clearGallery } from './journey.js';
 import { PALETTES } from './visuals.js';
 import * as capture from './capture.js';
@@ -55,6 +57,7 @@ function sync() {
   document.querySelectorAll('[data-mode]').forEach((b) => b.classList.toggle('active', b.dataset.mode === mk));
   $('invite').firstElementChild.textContent = INVITE[mk][0]; $('invite').lastElementChild.textContent = INVITE[mk][1];
   $('preset').value = settings.preset; $('sessionMin').value = settings.sessionMin; $('hintsOn').checked = settings.hints;
+  $('galOn').checked = settings.onlineGallery;
   $('journeyOn').checked = settings.journey; document.body.classList.toggle('journey', settings.journey);
   document.querySelectorAll('[data-preset]').forEach((b) => b.classList.toggle('active', b.dataset.preset === settings.preset && !settings.custom));
   $('cfg').textContent = (PRESETS[settings.preset]?.name || '') + (settings.custom ? ' · libre' : '');
@@ -227,17 +230,22 @@ function openRegie() { window.open('regie.html', 'foule-regie', 'width=540,heigh
 
 // Régie sur téléphone : un code QR à scanner, qui porte l'adresse de la régie et le code secret du canal.
 let qrFor = '';
+async function qr(el, url) {
+  try {
+    const qrcode = (await import('../vendor/qrcode.mjs')).default, q = qrcode(0, 'M');
+    q.addData(url); q.make();
+    el.innerHTML = q.createSvgTag({ cellSize: 4, margin: 3, scalable: true });
+  } catch { el.textContent = url; }
+}
 async function showNet() {
   const on = settings.remoteOn, url = on ? regieUrl() : '';
   $('netOn').checked = on; $('netBox').classList.toggle('on', on);
   if (!on || url === qrFor) return;
   qrFor = url;
-  try {
-    const qrcode = (await import('../vendor/qrcode.mjs')).default, q = qrcode(0, 'M');
-    q.addData(url); q.make();
-    $('qr').innerHTML = q.createSvgTag({ cellSize: 4, margin: 3, scalable: true });
-  } catch { $('qr').textContent = url; }
+  qr($('qr'), url);
 }
+// Les créatures vivantes du mur d'attente.
+let wall = [], wallQr = '';
 async function toggleNet(on, fresh) { await setNet(on, fresh); showNet(); }
 
 // ---------- Régie à distance (autre fenêtre du même navigateur, voir remote.js) ----------
@@ -306,6 +314,14 @@ export function init(h) {
   $('sessNew').onclick = newSession; $('sessEnd').onclick = endSession; $('openRegie').onclick = openRegie;
   $('journeyOn').onchange = (e) => { settings.journey = e.target.checked; sync(); };
   $('nextStop').onclick = nextStop; $('overflowBtn').onclick = overflow;
+  $('galOn').onchange = async (e) => { await setGallery(e.target.checked); sync(); };
+  $('galLink').onclick = () => { navigator.clipboard?.writeText(galleryUrl()).then(() => note('Lien de la galerie copié.', 2500), () => note(galleryUrl(), 9000)); };
+  $('galData').onclick = () => {          // la galerie définitive : un petit fichier à déposer sur le site
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify({ event: 'Assemblée créative de Genève, 19 novembre 2026', items: gallery.items.map((it) => it.code).filter(Boolean) }, null, 1)], { type: 'application/json' }));
+    a.download = 'galerie.json'; a.click();
+  };
+  animate(() => wall);
   $('galExport').onclick = async () => { if (!(await exportGallery())) note('La galerie est encore vide.', 3000); };
   $('galClear').onclick = (e) => {            // deux clics pour vider : pas de fenêtre de confirmation
     if (performance.now() - clearArmed < 3000) { clearGallery(); e.target.textContent = 'Vider la galerie'; clearArmed = 0; note('Galerie vidée.', 2500); }
@@ -468,21 +484,29 @@ function updateHints(now) {
   }
   if (on && el.textContent !== txt) el.textContent = txt;
   el.classList.toggle('on', on);
-  $('end').classList.toggle('on', ss.ended > 0);
+  $('end').classList.toggle('on', ss.ended > 0); $('take').classList.toggle('on', ss.ended > 0 && ss.ended < 23 && !!state.journey.last?.code);
   // Fin de session : la créature du trio reçoit son numéro. À l'attente : toutes celles de la soirée.
   const last = state.journey.last;
   if (ss.ended > 0 && last && endShown !== last) {
     endShown = last;
     $('end').innerHTML = `<b>Créature n° ${last.n}, ${esc(last.nick)}</b><small>née à ${last.at} ${esc(last.who)}</small><p>${esc(last.text)}</p>`;
+    // Son lien tient tout entier dans ce code QR : chacun repart avec sa créature.
+    if (last.code) { $('takeQr').innerHTML = ''; qr($('takeQr'), creatureUrl(last.code)); }
   }
   if (galleryShown !== gallery.version) {
     galleryShown = gallery.version;
-    const items = gallery.items.slice(-24);
-    $('gallery').innerHTML = items.map((it) => `<figure><img src="${it.img}" alt=""><figcaption>${esc(it.nick || 'n° ' + it.n)}</figcaption></figure>`).join('');
+    const items = gallery.items.slice(-24).map((it) => ({ ...it, ...(it.code ? decode(it.code) : null) }));
+    $('gallery').innerHTML = items.map((it) => `<figure>${it.form ? '<canvas></canvas>' : `<img src="${it.img}" alt="">`}<figcaption>${esc(it.nick || 'n° ' + it.n)}</figcaption></figure>`).join('');
+    wall = [...$('gallery').querySelectorAll('canvas')].map((cv, i) => new Living(cv, items.filter((it) => it.form)[i], { dust: 260 }));
     $('galCount').textContent = gallery.items.length ? `${gallery.items.length} créature${gallery.items.length > 1 ? 's' : ''} ce soir` : 'Galerie vide';
   }
-  const wall = state.music.running && d.attract && ss.ended === 0 && gallery.items.length > 0;
-  $('gallery').classList.toggle('on', wall); document.body.classList.toggle('wall', wall);
+  const waiting = state.music.running && d.attract && ss.ended === 0 && gallery.items.length > 0;
+  $('gallery').classList.toggle('on', waiting); document.body.classList.toggle('wall', waiting);
+  // Sur l'écran d'attente : le code QR de la galerie en ligne, où l'on retrouve toutes les créatures.
+  const gurl = waiting && settings.onlineGallery ? galleryUrl() : '';
+  $('all').classList.toggle('on', !!gurl);
+  if (gurl && gurl !== wallQr) { wallQr = gurl; qr($('allQr'), gurl); }
+  if (!$('panel').classList.contains('hidden')) { const gi = galleryInfo(); $('galInfo').textContent = !gi.on ? '' : gi.up ? `En ligne · relais ${gi.up}/2` : 'Connexion au relais… (Internet requis)'; }
   const dur = settings.sessionMin * 60;
   $('clock').style.width = (ss.on && dur && ss.ended === 0 ? clamp(ss.t / dur) * 100 : 0) + '%';
   $('cfg').classList.toggle('on', state.music.running && !d.attract);

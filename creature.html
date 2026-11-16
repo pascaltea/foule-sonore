@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Votre créature · Assemblée créative de Genève</title>
+<style>
+  /* La page d'une créature : tout ce qu'il faut pour la dessiner tient dans le lien, rien n'est stocké ailleurs. */
+  @font-face { font-family: "Anton"; src: url("fonts/anton-latin-400-normal.woff2") format("woff2"); font-display: swap; }
+  :root { --title: "Anton", "Impact", "Arial Narrow Bold", sans-serif; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; background: #000; color: #fff; font: 17px/1.5 "Helvetica Neue", Helvetica, Arial, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 5vh 22px 6vh; text-align: center; }
+  .eyebrow, h1, .born, .stops, a.all { font-family: var(--title); font-weight: 400; text-transform: uppercase; }
+  .eyebrow { margin: 0 0 3vh; font-size: 11px; letter-spacing: .3em; color: #9a9a9a; }
+  canvas { display: block; width: 100%; aspect-ratio: 5 / 3; }
+  h1 { margin: 3.5vh 0 1vh; font-size: clamp(26px, 7vw, 46px); line-height: 1.08; letter-spacing: .12em; }
+  .born { margin: 0; font-size: 12px; letter-spacing: .3em; color: #9a9a9a; }
+  p.text { margin: 3vh auto 0; max-width: 32em; font-size: clamp(17px, 4.4vw, 21px); }
+  .stops { margin: 3vh 0 0; font-size: 12px; letter-spacing: .3em; color: #9a9a9a; }
+  a.all { display: inline-block; margin-top: 5vh; padding: 14px 24px; border: 1px solid rgba(255,255,255,.3); color: #fff; text-decoration: none; font-size: 13px; letter-spacing: .24em; }
+  a.all:hover { background: #fff; color: #000; }
+  footer { margin-top: 5vh; font-size: 12px; color: #777; }
+</style>
+</head>
+<body>
+<main>
+  <p class="eyebrow">Assemblée créative de Genève · Downtown Studio · 19 novembre 2026</p>
+  <canvas id="c"></canvas>
+  <h1 id="name">Créature introuvable</h1>
+  <p class="born" id="born"></p>
+  <p class="text" id="text">Ce lien ne contient pas de créature. Scannez à nouveau le code affiché à la fin de votre session.</p>
+  <p class="stops" id="stops"></p>
+  <a class="all" id="all" href="galerie.html">Toutes les créatures</a>
+  <footer>Imaginons la Créature ensemble. Née de vos gestes : aucune image de vous n'a été enregistrée.</footer>
+</main>
+<script type="module">
+import { decode } from './js/portrait.js';
+import { Living, animate } from './js/creature-draw.js';
+const $ = (id) => document.getElementById(id), it = decode(location.hash.slice(1)), g = new URLSearchParams(location.search).get('g');
+$('all').href = 'galerie.html' + location.search.replace(/[?&]g=[^&]*/, '').replace(/^&/, '?') + (g ? '#' + g : '');
+if (it) {
+  document.title = `Créature n° ${it.n}, ${it.nick} · Assemblée créative de Genève`;
+  $('name').textContent = `Créature n° ${it.n}, ${it.nick}`;
+  $('born').textContent = `née à ${it.at} ${it.who}`;
+  $('text').textContent = it.text;
+  $('stops').textContent = it.stops.join(' · ');
+  const l = new Living($('c'), it, { dust: 2600 });
+  animate(() => [l]);
+} else $('c').style.display = 'none';
+</script>
+</body>
+</html>

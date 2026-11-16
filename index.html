@@ -138,6 +138,12 @@
   #end { position: fixed; inset: 0 4vw 50vh; display: grid; place-content: center; gap: 1.2vh; text-align: center; pointer-events: none;
     opacity: 0; transition: opacity 2s; font-family: var(--title); text-transform: uppercase; }
   #end.on { opacity: 1; }
+  /* Codes QR discrets, en bas à droite : la créature du trio à la fin, la galerie en ligne à l'attente. */
+  .corner { position: fixed; right: 2.4vw; bottom: 4vh; display: none; text-align: center; pointer-events: none; }
+  .corner.on { display: block; }
+  .corner div { width: clamp(110px, 12vw, 240px); background: #fff; line-height: 0; } .corner svg { width: 100%; height: auto; display: block; }
+  .corner span { display: block; margin-top: 1vh; font: 400 clamp(8px, .75vw, 13px)/1 var(--title); letter-spacing: .28em; text-transform: uppercase; color: #fff; opacity: .8; }
+  #gallery canvas { display: block; width: 100%; aspect-ratio: 5 / 3; }
   /* Écran d'attente : les créatures de la soirée, en mosaïque derrière l'invitation. */
   #gallery { position: fixed; inset: 40vh 6vw 13vh; display: none; flex-wrap: wrap; gap: 1vw; justify-content: center; align-content: center; pointer-events: none; opacity: .8; }
   #gallery.on { display: flex; }
@@ -181,7 +187,9 @@
   <select id="preset"></select>
   <div class="row"><button id="nextStop">Pays suivant</button><button id="overflowBtn" title="Déclenche le débordement sans attendre le geste du trio">Genève déborde</button></div>
   <div class="row"><button id="galExport" title="Toutes les créatures de la soirée en une image">Exporter la galerie</button><button id="galClear">Vider la galerie</button></div>
-  <p class="hint" id="galCount"></p>
+  <label class="check"><input id="galOn" type="checkbox"> Galerie en ligne, et code QR de chaque créature</label>
+  <div class="row"><button id="galLink">Copier le lien de la galerie</button><button id="galData" title="Le fichier à déposer sur le site pour garder la galerie après la soirée">Exporter les données</button></div>
+  <p class="hint"><span id="galCount"></span> <span id="galInfo"></span></p>
   <div class="row">
     <div style="flex:1"><label style="margin-top:0">Durée d'une session</label><select id="sessionMin"><option value="0">Libre</option><option value="3">3 minutes</option><option value="5">5 minutes</option><option value="8">8 minutes</option><option value="10">10 minutes</option></select></div>
   </div>
@@ -245,6 +253,8 @@
 <div id="clock"></div>
 <div id="gallery"></div>
 <div id="end"><b>Merci</b><small>Place aux suivants</small></div>
+<div id="take" class="corner"><div id="takeQr"></div><span>Emportez-la</span></div>
+<div id="all" class="corner"><div id="allQr"></div><span>Toutes les créatures</span></div>
 
 <div id="start">
   <p class="eyebrow">Assemblée créative de Genève · Downtown Studio · 19 novembre 2026</p>

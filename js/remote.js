@@ -3,7 +3,8 @@
 // - un autre appareil (téléphone), par Internet, quand « Régie sur téléphone » est activée (voir relay.js).
 import { settings, saveSettings } from './state.js';
 import { remoteHello, remoteState, remoteApply } from './ui.js';
-import { openRelay, brokersFromUrl } from './relay.js';
+import { openRelay, openFeed, brokersFromUrl } from './relay.js';
+import { gallery, onCreature } from './journey.js';
 
 let relay = null, heard = 0, up = 0, total = 0, opening = false;
 
@@ -25,6 +26,7 @@ export function init() {
   // Par Internet : l'état n'est envoyé que si une régie écoute, une fois par seconde.
   setInterval(() => { if (relay && Date.now() - heard < 12000) relay.send({ from: 'stage', type: 'state', data: remoteState() }); }, 1000);
   if (settings.remoteOn) setNet(true);
+  if (settings.onlineGallery) setGallery(true);
 }
 
 const newCode = () => Array.from(crypto.getRandomValues(new Uint8Array(10)), (b) => 'abcdefghjkmnpqrstuvwxyz23456789'[b % 31]).join('');
@@ -50,3 +52,24 @@ export function regieUrl() {
   u.search = b ? '?broker=' + encodeURIComponent(b) : ''; u.hash = settings.room || '';
   return u.href;
 }
+
+// ---------- Galerie en ligne ----------
+let feed = null, feedUp = 0;
+export async function setGallery(on) {
+  settings.onlineGallery = !!on;
+  if (feed) { feed.close(); feed = null; feedUp = 0; }
+  if (on && !settings.galleryCode) settings.galleryCode = newCode();
+  saveSettings();
+  if (!on) return;
+  try {
+    feed = await openFeed(settings.galleryCode, () => {}, (c) => {
+      const first = !feedUp && c > 0; feedUp = c;
+      if (first) gallery.items.forEach((it) => { if (it.code) feed.publish(it.n, it.code); });      // au branchement : tout ce qui existe déjà
+    }, brokersFromUrl());
+  } catch { feed = null; }
+}
+onCreature((item) => { if (feed && item.code) feed.publish(item.n, item.code); });
+export const galleryInfo = () => ({ on: settings.onlineGallery, up: feedUp });
+const page = (name, query, hash) => { const u = new URL(name, location.href), b = new URLSearchParams(location.search).get('broker'), q = new URLSearchParams(query); if (b) q.set('broker', b); u.search = q.toString() ? '?' + q : ''; u.hash = hash || ''; return u.href; };
+export const galleryUrl = () => page('galerie.html', {}, settings.onlineGallery ? settings.galleryCode : '');
+export const creatureUrl = (code) => page('creature.html', settings.onlineGallery && settings.galleryCode ? { g: settings.galleryCode } : {}, code);

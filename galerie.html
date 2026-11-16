@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Les créatures · Assemblée créative de Genève</title>
+<style>
+  /* Toutes les créatures de la soirée. Trois sources, fusionnées : le fichier galerie.json du site (définitif),
+     le fil en direct de la scène (galerie.html#code) et, sur l'ordinateur de scène, sa propre mémoire. */
+  @font-face { font-family: "Anton"; src: url("fonts/anton-latin-400-normal.woff2") format("woff2"); font-display: swap; }
+  :root { --title: "Anton", "Impact", "Arial Narrow Bold", sans-serif; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; background: #000; color: #fff; font: 15px/1.45 "Helvetica Neue", Helvetica, Arial, sans-serif; }
+  header { padding: 6vh 22px 2vh; text-align: center; }
+  .eyebrow, h1, #count, figcaption b, figcaption span { font-family: var(--title); font-weight: 400; text-transform: uppercase; }
+  .eyebrow { margin: 0 0 2vh; font-size: 11px; letter-spacing: .3em; color: #9a9a9a; }
+  h1 { margin: 0; font-size: clamp(34px, 9vw, 92px); line-height: .95; letter-spacing: .02em; }
+  header p.lead { max-width: 40em; margin: 2.4vh auto 0; color: #bdbdbd; }
+  #find { display: block; width: min(420px, 90vw); margin: 3.4vh auto 0; padding: 13px 16px; background: none; border: 1px solid rgba(255,255,255,.3); color: #fff; font: inherit; font-size: 16px; text-align: center; }
+  #find::placeholder { color: #888; }
+  #count { margin: 1.6vh 0 0; font-size: 11px; letter-spacing: .3em; color: #9a9a9a; }
+  #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 3vh 2vw; padding: 3vh 3vw 8vh; }
+  figure { margin: 0; } a { color: inherit; text-decoration: none; display: block; }
+  canvas { display: block; width: 100%; aspect-ratio: 5 / 3; }
+  figcaption { padding: 10px 4px 0; text-align: center; }
+  figcaption b { display: block; font-size: 17px; letter-spacing: .12em; }
+  figcaption span { display: block; margin-top: 5px; font-size: 10px; letter-spacing: .28em; color: #9a9a9a; }
+  #empty { padding: 8vh 22px; text-align: center; color: #9a9a9a; }
+</style>
+</head>
+<body>
+<header>
+  <p class="eyebrow">Assemblée créative de Genève · Downtown Studio · 19 novembre 2026</p>
+  <h1>Les créatures</h1>
+  <p class="lead">Chacune est née de trois inconnus qui ont joué ensemble cinq minutes. Aucune n'est la bonne : c'est l'ensemble qui dessine la Genève créative de demain.</p>
+  <input id="find" type="search" placeholder="Retrouver la vôtre : son numéro ou son surnom" autocomplete="off">
+  <p id="count"></p>
+</header>
+<div id="grid"></div>
+<p id="empty">Les premières créatures arrivent.</p>
+<script type="module">
+import { decode } from './js/portrait.js';
+import { Living, animate } from './js/creature-draw.js';
+const $ = (id) => document.getElementById(id), gcode = location.hash.slice(1), items = new Map(), living = [];
+const q = new URLSearchParams(location.search), keep = q.get('broker') ? '?broker=' + encodeURIComponent(q.get('broker')) : '';
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function add(code) {
+  const it = decode(code);
+  if (!it || items.has(it.n + '|' + it.at)) return;
+  items.set(it.n + '|' + it.at, it);
+  const fig = document.createElement('figure');
+  fig.dataset.key = `${it.n} ${it.nick}`.toLowerCase(); fig.dataset.n = it.n;
+  fig.innerHTML = `<a href="creature.html${keep}${keep ? '&' : '?'}g=${encodeURIComponent(gcode)}#${code}"><canvas></canvas><figcaption><b>N° ${it.n}, ${esc(it.nick)}</b><span>née à ${it.at} ${esc(it.who)}</span></figcaption></a>`;
+  const after = [...$('grid').children].find((f) => +f.dataset.n < it.n);       // les plus récentes d'abord
+  $('grid').insertBefore(fig, after || null);
+  living.push(new Living(fig.querySelector('canvas'), it, { dust: 700 }));
+  filter();
+}
+function filter() {
+  const s = $('find').value.trim().toLowerCase().replace(/^n°\s*/, '');
+  let shown = 0;
+  for (const f of $('grid').children) { const ok = !s || (/^\d+$/.test(s) ? f.dataset.n === s : f.dataset.key.includes(s)); f.style.display = ok ? '' : 'none'; if (ok) shown++; }
+  $('empty').style.display = items.size ? 'none' : '';
+  $('count').textContent = items.size ? `${shown} créature${shown > 1 ? 's' : ''}` : '';
+}
+$('find').oninput = filter;
+animate(() => living);
+// 1. La galerie définitive, déposée sur le site après la soirée.
+fetch('galerie.json').then((r) => (r.ok ? r.json() : null)).then((j) => j?.items?.forEach(add)).catch(() => {});
+// 2. Sur l'ordinateur de scène : ce qu'il a en mémoire.
+try { JSON.parse(localStorage.getItem('foule-sonore-galerie') || '{}').items?.forEach((it) => it.code && add(it.code)); } catch { /* rien */ }
+// 3. En direct pendant la soirée, par le code de la galerie.
+if (gcode) import('./js/relay.js').then(({ openFeed, brokersFromUrl }) => openFeed(gcode, add, () => {}, brokersFromUrl())).catch(() => {});
+</script>
+</body>
+</html>

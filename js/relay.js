@@ -31,3 +31,25 @@ export async function openRelay(room, side, onMsg, onStatus, brokers = BROKERS) 
     close() { clients.forEach((c) => c.end(true)); },
   };
 }
+
+// Galerie en ligne : chaque créature est un message « retenu » par les relais, sous un code de galerie. Toute page
+// qui s'abonne à ce code reçoit aussitôt toutes les créatures déjà nées, puis les suivantes en direct.
+// Les relais publics ne garantissent pas de garder ces messages pour toujours : après la soirée, la galerie
+// définitive est le fichier galerie.json du site (voir galerie.html).
+export async function openFeed(gcode, onCode, onStatus = () => {}, brokers = BROKERS) {
+  const mqtt = (await import('../vendor/mqtt.esm.js')).default;
+  const base = `foule-sonore/v1/galerie/${gcode}/`, seen = new Set();
+  const status = () => onStatus(clients.filter((c) => c.connected).length, clients.length);
+  const clients = brokers.map((url) => {
+    const c = mqtt.connect(url, { clientId: `fs-gal-${Math.random().toString(36).slice(2, 10)}`, keepalive: 30, reconnectPeriod: 2500, connectTimeout: 8000, clean: true });
+    c.on('connect', () => { c.subscribe(base + '+'); status(); });
+    c.on('close', status);
+    c.on('error', () => { /* le client réessaie tout seul */ });
+    c.on('message', (topic, payload) => { const code = payload.toString(); if (code && !seen.has(code)) { seen.add(code); onCode(code); } });
+    return c;
+  });
+  return {
+    publish(n, code) { seen.add(code); clients.forEach((c) => { if (c.connected) c.publish(base + n, code, { retain: true, qos: 1 }); }); },
+    close() { clients.forEach((c) => c.end(true)); },
+  };
+}

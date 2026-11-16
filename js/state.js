@@ -72,6 +72,8 @@ export const settings = Object.assign({
   journey: true,      // voyage aller-retour depuis Genève : les gestes collectifs font changer d'escale
   remoteOn: false,    // régie sur téléphone, par Internet
   room: '',           // code secret du canal de régie
+  onlineGallery: true, // les créatures sont publiées dans la galerie en ligne (galerie.html)
+  galleryCode: '',    // code de la galerie de cette scène
   cameraId: '',
   sensitivity: 1.3,   // foule large et lointaine : gain un peu relevé par défaut
   scale: 'pentaMin',

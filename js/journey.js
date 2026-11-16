@@ -9,6 +9,7 @@ import { PRESETS } from './music.js';
 import { applyPreset } from './ui.js';
 import { portrait } from './creature.js';
 import { slots } from './pose.js';
+import { formOf, describe, whoOf, encode, decode } from './portrait.js';
 
 const GKEY = 'foule-sonore-galerie', TOUR = ['mali', 'levant', 'inde', 'japon', 'caraibes'], MAX_ITEMS = 48, STOPS = 3;
 export const gallery = { n: 0, items: [], version: 0 };
@@ -68,75 +69,22 @@ function traits() {
     early, late, leader, allPlaces: people.length >= 2 && people.every(([, set]) => set.size >= 3),
   };
 }
-// La forme de la créature. Tenir ensemble : strates droites, contour net. Se faire de la place : une seule masse,
-// lueurs proches. Aller vers l'autre : largeur, grain qui sort du contour. Sauts : cornes. Débordements : veines.
-export function formOf(t) {
-  const hn = Math.min(3, Math.floor(t.jumps / 3));
-  return {
-    amp: 3 + 42 * (1 - t.r), freq: 1.4 + 5 * t.e, dens: 0.5 + 0.5 * t.e, split: (1 - t.r) ** 1.6 * (1 - t.c * 0.5), gap: t.hushes >= 2 ? 2 : 0, rig: t.r,
-    sx: 0.74 + 0.7 * t.o, sy: 1.2 - 0.46 * t.o, crest: 0.13 * (1 - t.c) * (0.4 + 0.6 * t.e) + 0.03 * (1 - t.r), sharp: 0.4 + 1.2 * t.r, k: 6 + 10 * t.e,
-    lobes: 0.3 * (1 - t.c) ** 1.5, horns: hn, eGap: 0.13 + 0.34 * (1 - t.c), eSize: 0.65 + 1.1 * t.o, eOpen: 0.3 + 0.7 * t.e, eAsym: 0.3 * (1 - t.r) * (t.e > 0.5 ? 1 : 0),
-    veins: Math.min(6, t.overflows), over: t.o * Math.min(1, t.overflows / 3 + 0.15),
-  };
-}
-
-// ---------- Surnoms et portraits ----------
-// Toutes les phrases affichées sont ici. Le portrait s'adresse au trio. Aucune ne juge : chacune dit un fait.
-const NB = ['zéro', 'une', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf', 'dix', 'onze', 'douze'];
-const nb = (n) => NB[n] || String(n);
-export const TEXTS = {
-  seul: 'Vous étiez seul, et vous avez tenu toute la scène sans jamais la laisser retomber.',
-  foule: 'Vous étiez nombreux, et vous avez joué comme un seul corps.',
-  accordee: 'Vous avez commencé chacun de votre côté, puis quelque chose s\'est calé et vous ne vous êtes plus quittés.',
-  patiente: 'Le début a été un joyeux brouillon. Puis vous vous êtes attendus, et la fin est d\'un seul geste.',
-  tenu: 'Un battement s\'est posé très tôt, et aucun de vous ne l\'a lâché.',
-  confidence: 'Vous avez joué bas, presque en confidence, sans jamais vous couvrir.',
-  place: 'Aucun de vous n\'a pris toute la place. Vous vous êtes laissé jouer.',
-  voix: 'Autant de façons de jouer que de joueurs, et aucune n\'a cédé. Vous ne vous êtes pas suivis, vous vous êtes répondus.',
-  cherche: 'Vous avez cherché l\'accord jusqu\'au bout, sans jamais arrêter de chercher.',
-  defaut: 'Vous vous êtes cherchés, et souvent trouvés.',
-  accueil: 'Quand un de plus est monté, vous lui avez fait de la place sans rien arrêter.',
-  places: 'Chacun de vous a tenu les trois places.',
-  echanges: (n) => `Vous avez échangé vos places ${nb(n)} fois : ce que l'un commençait, un autre le finissait.`,
-  premier: 'L\'un de vous partait toujours le premier. Les autres l\'ont rejoint à chaque fois.',
-  silences: (n) => `${nb(n)[0].toUpperCase() + nb(n).slice(1)} silences tenus ensemble : c'est rare.`,
-  sauts: (n) => `Vous avez sauté ${nb(n)} fois sans perdre le fil.`,
-  bras: 'Vous avez ouvert les bras avant même de savoir quoi jouer.',
-  deborde: (n) => (n === 1 ? 'Genève a débordé une fois.' : `Genève a débordé ${nb(n)} fois.`),
-};
-function describe(t, group) {
-  if (!group) return { nick: 'la Multitude', text: TEXTS.foule };
-  if (t.n <= 1) return { nick: 'la Solitaire', text: TEXTS.seul };
-  const joined = t.startN < t.n, patient = t.late - t.early > 0.25 && t.late > 0.55;
-  const nick = joined ? 'l\'Hospitalière' : t.allPlaces && t.swaps >= 5 ? 'la Passeuse' : t.r > 0.7 && t.c > 0.7 && t.o > 0.6 ? 'l\'Accordée' : patient ? 'la Patiente'
-    : t.jumps >= 6 && t.r > 0.55 ? 'la Funambule' : t.overflows >= 4 ? 'la Débordante' : t.leader ? 'l\'Éclaireuse' : t.r > 0.75 ? 'l\'Horlogère'
-      : t.c > 0.78 && t.e < 0.3 ? 'la Veilleuse' : t.c > 0.78 ? 'la Généreuse' : t.c < 0.38 ? 'la Polyphonique' : t.r < 0.35 ? 'la Chercheuse' : 'l\'Inattendue';
-  const a = t.r > 0.7 && t.c > 0.7 && t.o > 0.6 ? TEXTS.accordee : patient ? TEXTS.patiente : t.r > 0.75 ? TEXTS.tenu : t.c > 0.78 && t.e < 0.3 ? TEXTS.confidence
-    : t.c > 0.78 ? TEXTS.place : t.c < 0.38 ? TEXTS.voix : t.r < 0.35 ? TEXTS.cherche : TEXTS.defaut;
-  const facts = [];
-  if (joined) facts.push(TEXTS.accueil);
-  if (t.allPlaces && t.n >= 3) facts.push(TEXTS.places); else if (t.swaps >= 4) facts.push(TEXTS.echanges(t.swaps));
-  if (t.leader) facts.push(TEXTS.premier);
-  if (t.hushes >= 2) facts.push(TEXTS.silences(t.hushes));
-  if (t.jumps >= 6) facts.push(TEXTS.sauts(t.jumps));
-  if (t.o > 0.75 && !facts.length) facts.push(TEXTS.bras);
-  const out = [a, ...facts.slice(0, 2)];
-  if (t.overflows >= 1) out.push(TEXTS.deborde(t.overflows));
-  return { nick, text: out.join(' ') };
-}
-
 function finish() {
   const n = ++gallery.n, now = new Date(), group = settings.mode === 'group';
-  const t = traits(), who = !group ? 'd\'une foule' : t.n <= 1 ? 'd\'une personne seule' : `de ${['deux', 'trois', 'quatre', 'cinq'][Math.min(t.n, 5) - 2]} inconnus`;
-  J.traits = t; J.form = formOf(t); J.done = 1;
-  const { nick, text } = describe(t, group);
+  const at = `${now.getHours()} h ${String(now.getMinutes()).padStart(2, '0')}`;
+  // Tout passe par le code de la créature : ce que la scène affiche est exactement ce que son lien affichera.
+  const code = encode(n, at, group, traits(), J.bands), c = decode(code);
+  J.traits = c.traits; J.form = c.form; J.done = 1;
   let img = '';
   try { img = portrait(480, 288).toDataURL('image/jpeg', 0.82); } catch { /* portrait indisponible */ }
-  const item = { n, at: `${now.getHours()} h ${String(now.getMinutes()).padStart(2, '0')}`, who, nick, text, img };
+  const item = { n, at, who: whoOf(c.traits.n, group), nick: c.nick, text: c.text, img, code };
   J.last = item;
-  if (img) { gallery.items.push(item); if (gallery.items.length > MAX_ITEMS) gallery.items.shift(); }
+  gallery.items.push(item); if (gallery.items.length > MAX_ITEMS) gallery.items.shift();
   save(); gallery.version++;
+  handlers.onCreature?.(item);
 }
+const handlers = {};
+export function onCreature(fn) { handlers.onCreature = fn; }
 export function clearGallery() { gallery.items = []; gallery.n = 0; gallery.version++; save(); }
 
 export function update(dt) {

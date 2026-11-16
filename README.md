@@ -18,17 +18,22 @@ Dans les deux premiers modes, bouger joue, lever les mains monte dans l'aigu, de
 
 Le mode se choisit sur l'écran de démarrage ou dans la régie. Noms, couleurs et instruments des places se changent dans la régie.
 
-## Le voyage : Genève, aller-retour
+## Le voyage : Genève déborde sur le monde
 
-Par défaut, chaque session est un voyage.
+Par défaut, chaque session est un voyage, le même pour tous.
 
-- **Départ de Genève.** Le dôme est nu.
-- **Les escales.** Quand le trio lève les mains ensemble et tient deux secondes, il change de pays : nouveaux instruments, nouvelle gamme, nouvelle couleur. Sans ce geste, l'escale change seule au bout de 75 secondes. L'ordre des escales tourne d'une session à l'autre.
-- **Les strates.** Chaque escale dépose une strate sur le dôme, à sa couleur. Sa forme dépend de la façon dont on y a joué : épaisse si l'on y reste et qu'on joue fort, ondulée si l'on ouvre les bras, serrée si les gestes sont vifs.
-- **Le retour.** La dernière demi-minute ramène tout le monde à Genève.
-- **La créature.** Au final, le dôme se fige : c'est la créature de ce trio, numérotée, avec son heure de naissance et ses escales. Elle rejoint la galerie affichée sur l'écran d'attente entre deux sessions.
+- **Le trajet.** Départ de Genève, trois pays d'environ une minute (instruments, gamme et couleur changent), retour à Genève dans la dernière demi-minute. Les pays tournent d'une session à l'autre.
+- **Genève déborde.** Quand le trio lève les mains ensemble et tient deux secondes, la lumière verte de Genève inonde l'écran, son grain sort du contour de la créature et une veine verte s'y ajoute.
+- **La créature.** Pendant la session, le dôme prend peu à peu la forme de la façon de jouer ensemble, lue selon trois axes jamais nommés à l'écran : tenir ensemble (strates droites, contour net), se faire de la place (une seule masse, lueurs proches), aller vers l'autre (largeur, grain qui déborde). Les sauts donnent des cornes, les silences tenus des respirations noires.
+- **Les places.** Trois petits traits sous chaque instrument montrent les places que la personne a déjà tenues.
+- **La fin.** La créature se fige dans son aura, avec un numéro, un surnom et un portrait adressé au trio. Un code QR permet à chacun de l'emporter.
 
-La galerie est gardée dans le navigateur de l'ordinateur de scène (48 créatures au plus). « Exporter la galerie », dans les réglages, la télécharge en une seule image. Le voyage se désactive dans les réglages ou la régie ; on choisit alors l'escale à la main.
+### Retrouver les créatures
+
+- **Le lien d'une créature** (`creature.html#code`) contient tout ce qu'il faut pour la redessiner et réécrire son portrait : rien n'est stocké ailleurs, le lien marche pour toujours.
+- **La galerie en ligne** (`galerie.html`) les montre toutes, vivantes, avec une recherche par numéro ou surnom. Pendant la soirée, elle se remplit en direct par les relais de messagerie (Internet requis sur l'ordinateur de scène) ; son code QR s'affiche sur l'écran d'attente.
+- **Après la soirée**, « Exporter les données » dans les réglages télécharge `galerie.json`. Déposé à la racine du site, il rend la galerie définitive, sans dépendre des relais.
+- Les phrases des portraits et les surnoms sont dans `js/portrait.js` (`TEXTS`).
 
 ## Six escales
 
