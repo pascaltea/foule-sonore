@@ -7,6 +7,7 @@ import * as music from './music.js';
 import * as visuals from './visuals.js';
 import * as creature from './creature.js';
 import * as ui from './ui.js';
+import * as remote from './remote.js';
 
 let last = performance.now(), lowT = 0, highT = 0, glOk = true;
 
@@ -50,6 +51,7 @@ ui.init({
   onSim(v) { if (!v && state.music.running) { if (state.capture.mode !== 'camera') useCamera().then(usePose); else usePose(); } },
 });
 ui.refreshCameras();
+remote.init();
 
 function adaptQuality(rawDt) {
   const p = state.perf;

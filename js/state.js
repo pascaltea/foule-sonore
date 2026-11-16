@@ -41,7 +41,7 @@ export function sanitizeSectors(arr) {
   });
 }
 
-const KEY = 'foule-sonore-acg3';
+const KEY = 'foule-sonore-acg4';
 let saved = {};
 try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { /* stockage indisponible */ }
 
@@ -64,7 +64,11 @@ export function sanitizePlayers(arr) {
 export const settings = Object.assign({
   mode: 'group',      // 'crowd' (foule, secteurs fixes) ou 'group' (personnes suivies)
   zones: true,        // en 'group' : scène à trois, l'instrument dépend de la place (gauche, centre, droite)
-  creature: true,     // la Créature des affiches incarne la jauge collective
+  creature: true,     // le dôme incarne la jauge collective
+  preset: 'geneve',   // configuration d'instruments (voir PRESETS dans music.js)
+  custom: false,      // un instrument a été changé à la main depuis le choix de la configuration
+  sessionMin: 5,      // durée d'une session en minutes ; 0 = libre
+  hints: true,        // consignes de jeu affichées au public
   cameraId: '',
   sensitivity: 1.3,   // foule large et lointaine : gain un peu relevé par défaut
   scale: 'pentaMin',
@@ -99,7 +103,7 @@ export function saveSettings() {
   try { localStorage.setItem(KEY, JSON.stringify(keep)); } catch { /* ignoré */ }
 }
 
-const newSec = () => ({ energy: 0, speed: 0, coherence: 0, cy: 0.5, peakCount: 0, peakAge: 99, eFast: 0, eSlow: 0, pulse: 0, on: false });
+const newSec = () => ({ open: 0.5, up: false, energy: 0, speed: 0, coherence: 0, cy: 0.5, peakCount: 0, peakAge: 99, eFast: 0, eSlow: 0, pulse: 0, on: false });
 
 export const state = {
   // Champ de mouvement, en cellules de grille par seconde, + activité 0..1 par cellule.
@@ -113,7 +117,9 @@ export const state = {
     cx: 0.5, cy: 0.5, dispersion: 0,
     pulseBpm: 0, pulseConf: 0, peakCount: 0, peakAge: 99, stillTime: 0, still: false,
   },
-  drama: { gauge: 0, tier: 0, phase: 'build', phaseT: 0, attract: true, tierUps: 0, act: 0 },
+  drama: { gauge: 0, tier: 0, phase: 'build', phaseT: 0, attract: true, tierUps: 0, act: 0,
+    lift: 0, liftStarts: 0, liftCd: 0, drops: 0, hush: false, hushT: 0, hushEnds: 0, loudAge: 99, quietT: 0 },
+  session: { on: false, t: 0, ended: 0, ends: 0, idle: 0 },
   music: {
     running: false, bpm: 90, beatPulse: 0, beatCount: 0, accent: 0, accentCount: 0, accentX: 0.5, accentY: 0.5,
     chord: 0, level: 0,

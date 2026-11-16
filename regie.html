@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Régie · Foule Sonore</title>
+<style>
+  /* Régie : à ouvrir dans le même navigateur que la scène (autre fenêtre, autre écran). Elle pilote la scène en direct. */
+  @font-face { font-family: "Anton"; src: url("fonts/anton-latin-400-normal.woff2") format("woff2"); }
+  :root { --dim: #a8a8a8; --line: rgba(255,255,255,.18); --title: "Anton", "Impact", "Arial Narrow Bold", sans-serif; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 18px; background: #0b0b0b; color: #fff; font: 14px/1.45 "Helvetica Neue", Helvetica, Arial, sans-serif; }
+  h1, h2, .cap { font-family: var(--title); font-weight: 400; text-transform: uppercase; }
+  h1 { margin: 0; font-size: 26px; letter-spacing: .04em; }
+  h2 { margin: 22px 0 8px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 12px; letter-spacing: .28em; color: var(--dim); }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  #link { font-size: 12px; color: #ff8a5c; } #link.ok { color: #7be08a; }
+  #status { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; margin-top: 12px; }
+  #time { font: 400 34px/1 var(--title); letter-spacing: .04em; font-variant-numeric: tabular-nums; }
+  #what { font-size: 12px; color: var(--dim); text-align: right; }
+  #bar { grid-column: 1 / 3; height: 6px; background: rgba(255,255,255,.14); } #bar i { display: block; height: 100%; width: 0; background: #fff; }
+  #presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  #presets button { padding: 14px 8px; text-align: center; }
+  #presets b { display: block; font: 400 20px/1 var(--title); text-transform: uppercase; letter-spacing: .06em; }
+  #presets span { display: block; margin-top: 6px; font-size: 11px; line-height: 1.35; color: var(--dim); }
+  #presets kbd { position: absolute; left: 7px; top: 5px; font: 11px/1 inherit; color: var(--dim); }
+  #presets button { position: relative; }
+  button, select { font: inherit; color: #fff; background: rgba(255,255,255,.07); border: 1px solid var(--line); border-radius: 2px; padding: 9px 10px; cursor: pointer; }
+  button:hover { background: rgba(255,255,255,.15); }
+  button.active { background: #fff; color: #000; border-color: #fff; } #presets button.active span, #presets button.active kbd { color: #444; }
+  .place { display: grid; grid-template-columns: 74px 1fr 90px 64px; gap: 8px; align-items: center; margin-top: 8px; }
+  .place .cap { font-size: 12px; letter-spacing: .2em; color: var(--dim); } .place.here .cap { color: #fff; }
+  .place .cap i { display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: #444; } .place.here .cap i { background: #7be08a; }
+  .place meter { width: 100%; } select { width: 100%; }
+  input[type=range] { width: 100%; accent-color: #fff; margin: 0; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+  label { display: block; font-size: 12px; color: var(--dim); } label span { float: right; color: #fff; font-variant-numeric: tabular-nums; }
+  .row { display: flex; gap: 8px; margin-top: 10px; } .row > * { flex: 1; }
+  .check { display: flex; align-items: center; gap: 8px; color: #fff; font-size: 13px; margin-top: 10px; }
+  p.note { font-size: 12px; color: var(--dim); margin: 14px 0 0; }
+</style>
+</head>
+<body>
+<header><h1>Régie</h1><span id="link">Scène introuvable : ouvrez Foule Sonore dans ce même navigateur</span></header>
+<div id="status"><div id="time">0:00</div><div id="what"></div><div id="bar"><i></i></div></div>
+
+<h2>Voyages · touches 1 à 6</h2>
+<div id="presets"></div>
+
+<h2>Instruments par place</h2>
+<div id="places"></div>
+
+<h2>Session</h2>
+<div class="grid">
+  <div><label>Durée</label><select id="sessionMin"><option value="0">Libre</option><option value="3">3 minutes</option><option value="5">5 minutes</option><option value="8">8 minutes</option><option value="10">10 minutes</option></select></div>
+  <div><label>Vitesse de la montée <span id="vDrama"></span></label><input id="dramaSpeed" type="range" min="0.25" max="6" step="0.25"></div>
+</div>
+<div class="row"><button id="new">Nouvelle session (N)</button><button id="end">Final (Entrée)</button></div>
+<label class="check"><input id="hints" type="checkbox"> Consignes de jeu à l'écran</label>
+
+<h2>Son</h2>
+<div class="grid">
+  <div><label>Volume général <span id="vVol"></span></label><input id="volume" type="range" min="0" max="1" step="0.01"></div>
+  <div><label>Sensibilité aux gestes <span id="vSens"></span></label><input id="sensitivity" type="range" min="0.3" max="4" step="0.05"></div>
+  <div><label>Gamme</label><select id="scale"></select></div>
+  <div><label>Tonalité</label><select id="key"></select></div>
+</div>
+<p class="note">Changer de voyage remplace d'un coup les trois instruments, la gamme, la tonalité et le tempo, sans couper le son. Un instrument peut ensuite être changé seul.</p>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const ch = new BroadcastChannel('foule-sonore');
+const send = (m) => ch.postMessage({ from: 'regie', ...m });
+let hello = null, st = null, lastSeen = 0, built = '';
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const idle = (el) => document.activeElement !== el;       // on ne touche pas à un réglage en cours de manipulation
+
+function build() {
+  $('presets').innerHTML = hello.presets.map((p, i) => `<button data-id="${p.id}"><kbd>${i + 1}</kbd><b>${esc(p.name)}</b><span>${p.insts.map(esc).join('<br>')}</span></button>`).join('');
+  $('presets').querySelectorAll('button').forEach((b) => { b.onclick = () => send({ type: 'preset', id: b.dataset.id }); });
+  for (const [id, list] of [['scale', Object.entries(hello.scales)], ['key', hello.keys.map((k, i) => [i, k])]]) {
+    $(id).innerHTML = list.map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join('');
+  }
+}
+function buildPlaces() {
+  const opts = Object.entries(hello.instruments).map(([k, l]) => `<option value="${k}">${esc(l)}</option>`).join('');
+  $('places').innerHTML = st.places.map((p, i) => `<div class="place" data-i="${i}"><span class="cap"><i></i>${esc(p.name)}</span>
+    <select data-f="inst">${opts}</select><input data-f="vol" type="range" min="0" max="1.5" step="0.05" title="Volume">
+    <button data-f="mute">Muet</button></div>`).join('');
+  $('places').querySelectorAll('[data-f]').forEach((el) => {
+    const i = +el.closest('.place').dataset.i, f = el.dataset.f;
+    if (f === 'inst') el.onchange = () => send({ type: 'inst', i, inst: el.value });
+    else if (f === 'vol') el.oninput = () => send({ type: 'vol', i, v: +el.value });
+    else el.onclick = () => send({ type: 'mute', i, v: !st.places[i].mute });
+  });
+}
+function render() {
+  if (!hello || !st) return;
+  const sig = st.places.map((p) => p.name).join('|');
+  if (sig !== built) { built = sig; buildPlaces(); }
+  $('presets').querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.id === st.preset && !st.custom));
+  document.querySelectorAll('.place').forEach((row, i) => {
+    const p = st.places[i]; if (!p) return;
+    row.classList.toggle('here', p.present && st.mode !== 'crowd' || p.on);
+    const s = row.querySelector('[data-f=inst]'), v = row.querySelector('[data-f=vol]');
+    if (idle(s)) s.value = p.inst; if (idle(v)) v.value = p.vol;
+    row.querySelector('[data-f=mute]').classList.toggle('active', p.mute);
+  });
+  for (const k of ['volume', 'sensitivity', 'dramaSpeed', 'sessionMin', 'scale', 'key']) if (idle($(k))) $(k).value = st.set[k];
+  $('hints').checked = st.set.hints;
+  $('vVol').textContent = Math.round(st.set.volume * 100) + ' %'; $('vSens').textContent = (+st.set.sensitivity).toFixed(2); $('vDrama').textContent = '×' + st.set.dramaSpeed;
+  const t = st.session.t, dur = st.set.sessionMin * 60;
+  $('time').textContent = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}` + (dur ? ` / ${st.set.sessionMin}:00` : '');
+  $('bar').firstElementChild.style.width = (dur ? Math.min(1, t / dur) * 100 : 0) + '%';
+  const n = st.places.filter((p) => p.on).length;
+  $('what').innerHTML = !st.running ? 'Scène pas encore démarrée' : st.session.ended ? 'Final en cours' : st.attract ? 'En attente de joueurs' :
+    `${n} en jeu · ${st.bpm} BPM · montée ${Math.round(st.gauge * 100)} %${st.phase === 'climax' ? ' · éveil' : ''}${st.hush ? ' · silence' : ''}${st.lift > 0 ? ' · mains en l\'air' : ''}${st.set.simulate ? ' · simulation' : ''}`;
+}
+ch.onmessage = (e) => {
+  const m = e.data; if (!m || m.from !== 'stage') return;
+  lastSeen = Date.now();
+  if (m.type === 'hello') { hello = m.data; build(); } else if (m.type === 'state') { st = m.data; if (!hello) send({ type: 'hello' }); }
+  render();
+};
+setInterval(() => { const ok = Date.now() - lastSeen < 1500; $('link').classList.toggle('ok', ok); $('link').textContent = ok ? 'Reliée à la scène' : 'Scène introuvable : ouvrez Foule Sonore dans ce même navigateur'; if (!ok) send({ type: 'hello' }); }, 700);
+for (const k of ['volume', 'sensitivity', 'dramaSpeed']) $(k).oninput = (e) => send({ type: 'set', key: k, value: +e.target.value });
+for (const k of ['sessionMin', 'key']) $(k).onchange = (e) => send({ type: 'set', key: k, value: +e.target.value });
+$('scale').onchange = (e) => send({ type: 'set', key: 'scale', value: e.target.value });
+$('hints').onchange = (e) => send({ type: 'set', key: 'hints', value: e.target.checked });
+$('new').onclick = () => send({ type: 'cmd', name: 'new' });
+$('end').onclick = () => send({ type: 'cmd', name: 'end' });
+addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'SELECT' || e.metaKey || e.ctrlKey || !hello) return;
+  const n = e.code.startsWith('Digit') ? +e.code.slice(5) : 0;
+  if (n >= 1 && n <= hello.presets.length) send({ type: 'preset', id: hello.presets[n - 1].id });
+  else if (e.key === 'Enter') send({ type: 'cmd', name: 'end' });
+  else if (e.key.toLowerCase() === 'n') send({ type: 'cmd', name: 'new' });
+});
+send({ type: 'hello' });
+</script>
+</body>
+</html>

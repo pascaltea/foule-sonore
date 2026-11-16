@@ -125,17 +125,64 @@ function analysePulse() {
 }
 
 // Jauge collective : monte quand la foule bouge ensemble, débloque 3 paliers puis un climax.
+// Gestes collectifs du petit groupe : il faut être au moins deux.
+// Mains en l'air ensemble, tenues 2 s : montée puis grande frappe, et la jauge gagne un cran.
+// Silence ensemble : tout le monde se fige d'un coup après avoir joué ; la musique se tait, la reprise claque.
+function updateTogether(dt) {
+  const d = state.drama, m = state.m, group = settings.mode === 'group';
+  let n = 0, up = 0, maxE = 0;
+  if (group) settings.sectors.forEach((s, i) => { if (s.present) { n++; if (state.sec[i].up) up++; maxE = Math.max(maxE, state.sec[i].energy); } });
+  d.liftCd = Math.max(0, d.liftCd - dt);
+  if (n >= 2 && up === n && d.liftCd <= 0 && !d.attract) {
+    const before = d.lift;
+    d.lift = Math.min(1, d.lift + dt / 2.2);
+    if (before < 0.2 && d.lift >= 0.2) d.liftStarts++;          // la montée ne part que si le geste est tenu, pas sur un simple passage
+    if (d.lift >= 1) { d.drops++; d.lift = 0; d.liftCd = 9; d.gauge = clamp(d.gauge + 0.12); }
+  } else if (d.lift > 0) { d.lift = Math.max(0, d.lift - dt * 1.5); if (d.lift === 0 && d.liftCd <= 0) d.liftCd = 2.5; }
+
+  d.loudAge = n >= 2 && m.playing >= 2 && maxE > 0.3 ? 0 : d.loudAge + dt;
+  d.quietT = n >= 2 && maxE < 0.07 ? d.quietT + dt : 0;
+  if (!d.hush && d.quietT > 0.45 && d.loudAge < 2.2) { d.hush = true; d.hushT = 0; }
+  if (d.hush) {
+    d.hushT += dt;
+    if (maxE > 0.16 || n < 2) { d.hush = false; if (d.hushT > 0.5 && n >= 2) { d.hushEnds++; d.gauge = clamp(d.gauge + 0.08); } }
+    else if (d.hushT > 7) d.hush = false;
+  }
+}
+
+// Session : démarre au premier mouvement, dure settings.sessionMin minutes, se termine par un accord final.
+function updateSession(dt) {
+  const ss = state.session, d = state.drama, m = state.m, dur = settings.sessionMin * 60;
+  if (ss.ended > 0) {
+    ss.ended = Math.max(0, ss.ended - dt);
+    d.gauge = Math.max(0, d.gauge - dt * 0.14); d.phase = 'build';
+    if (ss.ended === 0) { ss.on = false; ss.t = 0; }
+    return;
+  }
+  if (!ss.on) { if (!d.attract && m.energy > 0.1) { ss.on = true; ss.t = 0; ss.idle = 0; } return; }
+  ss.t += dt;
+  ss.idle = d.attract ? ss.idle + dt : 0;
+  if (ss.idle > 10) { ss.on = false; ss.t = 0; d.gauge = 0; return; }            // la scène s'est vidée
+  if (dur && ss.t >= dur) { ss.ended = 10; ss.ends++; }
+}
+export function endSession() { const ss = state.session; if (ss.ended === 0) { ss.on = true; ss.ended = 10; ss.ends++; } }
+export function newSession() { const ss = state.session; ss.ended = 0; ss.on = false; ss.t = 0; state.drama.gauge = 0; state.drama.phase = 'build'; }
+
 export function updateDrama(dt) {
-  const d = state.drama, m = state.m, k = settings.dramaSpeed;
+  const d = state.drama, m = state.m, ss = state.session, left = settings.sessionMin * 60 - ss.t;
+  // Dernière demi-minute : tout monte plus vite, pour finir en haut.
+  const k = settings.dramaSpeed * (ss.on && settings.sessionMin && left < 35 ? 2.5 : 1);
+  updateTogether(dt);
+  updateSession(dt);
   d.phaseT += dt;
-  if (d.phase === 'build') {
+  if (ss.ended > 0) { /* fin de session : la jauge redescend seule (updateSession) */ } else if (d.phase === 'build') {
     // Bouger ne suffit pas : c'est bouger ensemble qui remplit la jauge.
     const coop = m.energy * (0.1 + 0.9 * m.coherence * m.coherence);
     const next = clamp(d.gauge + dt * k * (0.024 * coop - 0.004 - 0.006 * (1 - m.energy)));
     // Scène à trois : chaque personne qui joue ouvre un étage de plus. Seul, on tire la Créature du sommeil ;
     // à deux, elle ouvre grand les yeux ; il faut être trois pour la réveiller tout à fait.
     const cap = trio() ? [0.12, 0.34, 0.64, 1][m.playing] : 1;
-    d.gauge = next <= cap ? next : Math.max(cap, Math.min(next, d.gauge - dt * 0.05));
+    if (!d.hush) d.gauge = next <= cap ? next : Math.max(cap, Math.min(next, d.gauge - dt * 0.05));       // le silence collectif ne coûte rien
     if (d.gauge >= 1) { d.phase = 'climax'; d.phaseT = 0; d.tierUps++; }
   } else if (d.phase === 'climax') {
     d.gauge = 1;

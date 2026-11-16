@@ -15,7 +15,7 @@ export const status = { ready: false, loading: false, error: '' };
 export const slots = Array.from({ length: MAX_PLAYERS }, () => ({
   on: false, fresh: true, lost: 0, cx: 0, cy: 0, torso: 0.15,
   px: new Float32Array(NJ), py: new Float32Array(NJ), vx: new Float32Array(NJ), vy: new Float32Array(NJ), vis: new Float32Array(NJ),
-  tE: 0, tS: 0, tC: 0, tCy: 0.5, jumpAge: 9,
+  tE: 0, tS: 0, tC: 0, tCy: 0.5, tOpen: 0.5, up: false, jumpAge: 9,
 }));
 let landmarker = null, loading = null, lastVT = -1;
 
@@ -69,9 +69,9 @@ function ingestZones(cs, dt) {
     const o = slots[c.prev], s = slots[z];
     if (!s.on) {
       for (const k of ['px', 'py', 'vx', 'vy', 'vis']) s[k].set(o[k]);
-      Object.assign(s, { torso: o.torso, cx: o.cx, cy: o.cy, jumpAge: o.jumpAge, tE: o.tE, tS: o.tS, tC: o.tC, tCy: o.tCy, on: true, fresh: false, lost: 0 });
+      Object.assign(s, { torso: o.torso, cx: o.cx, cy: o.cy, jumpAge: o.jumpAge, tE: o.tE, tS: o.tS, tC: o.tC, tCy: o.tCy, tOpen: o.tOpen, up: o.up, on: true, fresh: false, lost: 0 });
       const q = state.sec[z], p = state.sec[c.prev];
-      q.energy = p.energy; q.speed = p.speed; q.coherence = p.coherence; q.cy = p.cy; q.eFast = p.eFast; q.eSlow = p.eSlow;
+      q.energy = p.energy; q.speed = p.speed; q.coherence = p.coherence; q.cy = p.cy; q.open = p.open; q.eFast = p.eFast; q.eSlow = p.eSlow;
       c.same = true;
     }
     if (!best[c.prev]) { drop(o); state.sec[c.prev].energy *= 0.3; }
@@ -135,6 +135,10 @@ function track(s, c, dt) {
   // Hauteur des mains : aux hanches = grave, au-dessus de la tête = aigu.
   const hands = s.vis[15] >= 0.4 || s.vis[16] >= 0.4;
   if (hands) s.tCy = clamp(((s.py[15] + s.py[16]) / 2 - (shy - s.torso)) / (2 * s.torso));
+  // Ouverture des bras : écart entre les deux mains, en longueurs de torse. Les deux mains au-dessus des épaules = « mains en l'air ».
+  const both = s.vis[15] >= 0.4 && s.vis[16] >= 0.4;
+  if (both) s.tOpen = clamp((Math.hypot((s.px[15] - s.px[16]) * ASPECT, s.py[15] - s.py[16]) / s.torso - 1) / 2);
+  s.up = both && s.py[15] < shy && s.py[16] < shy;
   // Saut : les hanches montent vite.
   s.jumpAge += dt;
   s.jump = (s.vy[23] + s.vy[24]) / 2 / s.torso < -1.8 && s.jumpAge > 0.8;
@@ -159,7 +163,7 @@ function figure(cx, top, T, aL, aR, hand) {
 
 function simPoses(t) {
   const p = settings.simPreset, T = 0.17, top = 0.36, out = [], jump = simJumping() ? -0.6 * T : 0;
-  const n = Math.min(trio() ? ZONES : MAX_PLAYERS, [1, 1, 2, 3, 5, 5][p] ?? 1), tw = 6.283;
+  const n = Math.min(trio() ? ZONES : MAX_PLAYERS, [1, 1, 2, 3, 5, 5, 3, 3][p] ?? 1), tw = 6.283;
   const turn = settings.simSector >= 0 ? settings.simSector % n : Math.floor(t / 6) % n;
   for (let j = 0; j < n; j++) {
     let cx = (j + 0.5) / n, y = top + jump, aL = 0.3, aR = 0.3, hand = null;
@@ -169,6 +173,8 @@ function simPoses(t) {
     else if (p === 2) { aL = 1.6 + 1.1 * Math.sin(t * tw * (0.7 + 0.5 * j) + ph); aR = 1.4 + 1.2 * Math.sin(t * tw * (0.9 + 0.4 * j)); }   // duo libre
     else if (p === 3) { const s = Math.sin(t * tw * 112 / 120); aL = aR = 1.7 + 1.0 * s; cx += 0.02 * s; }            // trio synchronisé
     else if (p === 4) { const s = Math.sin(t * tw * 128 / 60); aL = 2.2 + 0.8 * s; aR = 2.2 - 0.8 * s; y -= 0.35 * T * Math.abs(Math.sin(t * tw * 128 / 120)); }
+    else if (p === 6) { aL = aR = 2.9 + 0.12 * Math.sin(t * 9 + j); }                                                  // mains en l'air ensemble
+    else if (p === 7) { aL = aR = 0.3; }                                                                               // silence ensemble
     else if (j === turn) { const s = Math.sin(t * tw * 112 / 60); aL = aR = 1.8 + 1.0 * s; }                           // tournée : chacun son tour
     out.push(figure(cx, y, T, aL, aR, hand));
   }
@@ -197,6 +203,7 @@ export function update(dt) {
     q.speed = smooth(q.speed, s.on ? s.tS : 0, dt, 0.25, 0.8);
     q.coherence = smooth(q.coherence, s.on ? s.tC : 0, dt, 0.5, 1.0);
     if (s.on) q.cy = smooth(q.cy, s.tCy, dt, 0.15);
+    q.open = smooth(q.open, s.on ? s.tOpen : 0.5, dt, 0.2); q.up = s.on && s.up;
     q.eFast = smooth(q.eFast, e, dt, 0.1); q.eSlow = smooth(q.eSlow, e, dt, 1.5);
     q.peakAge += dt;
     if (s.on && (s.jump || q.eFast - q.eSlow > 0.3) && q.peakAge > 1.2) { q.peakCount++; q.peakAge = 0; }

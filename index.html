@@ -92,24 +92,54 @@
   .keys { margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--line); color: var(--dim); font-size: 12px; }
   kbd { font: inherit; color: var(--ink); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; }
 
-  #start { position: fixed; inset: 0; display: grid; place-items: center; background: #000; text-align: center; padding: 24px; overflow: auto; }
+  /* Écran d'accueil : le dôme attend au bas de l'écran, on choisit sa configuration et on lance. */
+  #start { position: fixed; inset: 0; display: grid; align-content: start; justify-items: center; overflow: auto; text-align: center;
+    padding: 4.5vh 4vw 3vh; background: linear-gradient(#000 0%, rgba(0,0,0,.9) 58%, rgba(0,0,0,.25) 100%); }
   #start.hidden { display: none; }
-  #start .eyebrow { margin: 0 0 2.2vh; max-width: none; font: 400 clamp(11px, 1.15vw, 18px)/1.2 var(--title); letter-spacing: .32em; text-transform: uppercase; color: #fff; }
-  #start h1 { margin: 0; font: 400 clamp(64px, 15vw, 230px)/0.92 var(--title); text-transform: uppercase; letter-spacing: .005em; color: var(--p1); }
-  #start .tag { margin: 2.4vh 0 3.6vh; max-width: none; font: 400 clamp(13px, 1.5vw, 24px)/1.2 var(--title); letter-spacing: .2em; text-transform: uppercase; }
-  #start .tag i { font-style: normal; }
-  #start p { color: var(--dim); max-width: 52ch; margin: 18px auto 28px; font-size: 16px; }
-  #start button { width: auto; padding: 14px 30px; border-radius: 0; font: 400 19px/1 var(--title); letter-spacing: .08em; text-transform: uppercase; }
-  #btnStart { background: var(--p1); color: #000; border-color: transparent; }
-  #btnStart:hover { background: #fff; }
-  #modes { display: inline-flex; flex-wrap: wrap; justify-content: center; gap: 0; margin: 0; border: 1px solid var(--line); }
-  #modes button { padding: 11px 22px; font-size: 15px; background: none; border-color: transparent; color: var(--dim); }
-  #modes button.active { background: #fff; color: #000; }
+  #start .eyebrow, #start .tag, #start h4 { margin: 0; font-family: var(--title); font-weight: 400; text-transform: uppercase; letter-spacing: .34em; text-indent: .34em; }
+  #start .eyebrow { font-size: clamp(10px, .95vw, 16px); color: var(--dim); }
+  #start h1 { margin: 1.4vh 0 1vh; font: 400 min(10vw, 17vh)/0.9 var(--title); text-transform: uppercase; letter-spacing: .01em; color: #fff; }
+  #start .tag { font-size: clamp(11px, 1.15vw, 20px); color: #fff; }
+  #start h4 { margin: 3.4vh 0 1.2vh; font-size: clamp(9px, .8vw, 13px); color: var(--dim); }
+  #presetPick { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0; width: min(92vw, 1180px); border: 1px solid var(--line); }
+  #presetPick button { width: auto; padding: 1.8vh .6vw 1.6vh; border: 0; border-radius: 0; background: none; color: var(--dim); text-align: center; }
+  #presetPick button + button { border-left: 1px solid var(--line); }
+  #presetPick b { display: block; font: 400 clamp(15px, 1.9vw, 30px)/1 var(--title); text-transform: uppercase; letter-spacing: .06em; color: #fff; }
+  #presetPick i { display: block; margin: .7vh 0 1vh; font: 400 clamp(8px, .7vw, 12px)/1.2 var(--title); font-style: normal; text-transform: uppercase; letter-spacing: .26em; }
+  #presetPick span { display: block; font-size: clamp(10px, .85vw, 14px); line-height: 1.5; }
+  #presetPick button:hover { background: rgba(255,255,255,.07); }
+  #presetPick button.active { background: #fff; color: #333; }
+  #presetPick button.active b { color: #000; }
+  #how { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0 1.6vw; width: min(92vw, 1180px); margin: 0; padding: 0; list-style: none; }
+  #how li { padding-top: 1.1vh; border-top: 1px solid var(--line); font-size: clamp(10px, .9vw, 14px); line-height: 1.4; color: var(--dim); }
+  #how b { display: block; margin-bottom: .3vh; font: 400 clamp(10px, .95vw, 15px)/1.2 var(--title); text-transform: uppercase; letter-spacing: .18em; color: #fff; }
+  #go { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 12px; margin-top: 3.4vh; }
+  #start button { font-family: var(--title); font-weight: 400; text-transform: uppercase; }
+  #btnStart { width: auto; padding: 15px 34px; border: 0; border-radius: 0; background: #fff; color: #000; font-size: 18px; letter-spacing: .12em; }
+  #btnStart:hover { background: var(--p1); }
+  #btnSim, #modes button { width: auto; padding: 10px 16px; border-radius: 0; background: none; font-size: 12px; letter-spacing: .2em; color: var(--dim); }
+  #modes { display: inline-flex; margin-top: 1.8vh; border: 1px solid var(--line); }
+  #modes button { border: 0; }
+  #modes button.active { background: rgba(255,255,255,.16); color: #fff; }
+  #start .fine { max-width: 110ch; margin: 1.5vh 0 0; font-size: 12px; color: #8a8a8a; }
+
+  /* Pendant la session : consigne du moment, configuration en cours, horloge, mot de la fin. */
+  #hint { position: fixed; left: 0; right: 0; top: 11vh; text-align: center; pointer-events: none; opacity: 0; transition: opacity 1.2s;
+    font: 400 clamp(11px, 1.25vw, 24px)/1.2 var(--title); text-transform: uppercase; letter-spacing: .3em; text-indent: .3em; color: #fff; }
+  #hint.on { opacity: .82; }
+  #cfg { position: fixed; left: 2.4vw; bottom: 3vh; pointer-events: none; opacity: 0; transition: opacity 1.5s;
+    font: 400 clamp(9px, .85vw, 15px)/1 var(--title); text-transform: uppercase; letter-spacing: .34em; color: #fff; }
+  #cfg.on { opacity: .4; }
+  #clock { position: fixed; left: 0; bottom: 0; height: 2px; width: 0; background: rgba(255,255,255,.45); pointer-events: none; }
+  #end { position: fixed; inset: 0 4vw 34vh; display: grid; place-content: center; gap: 1.6vh; text-align: center; pointer-events: none;
+    opacity: 0; transition: opacity 2s; font-family: var(--title); text-transform: uppercase; }
+  #end.on { opacity: 1; }
+  #end b { font-weight: 400; font-size: clamp(22px, 4vw, 76px); letter-spacing: .3em; text-indent: .3em; color: #fff; }
+  #end small { font-size: clamp(10px, .95vw, 18px); letter-spacing: .34em; text-indent: .34em; color: #fff; opacity: .8; }
   body.group .crowdOnly { display: none !important; }
   body:not(.group) .groupOnly, body.trio .groupOnly { display: none !important; }
   body:not(.trio) .trioOnly { display: none !important; }
   body.group .sec [data-f=del] { display: none; }
-  #start .alt { display: block; margin: 14px auto 0; background: none; border-color: var(--line); font-size: 14px; padding: 10px 20px; color: var(--dim); }
 </style>
 </head>
 <body>
@@ -124,6 +154,14 @@
 
 <aside id="panel" class="hidden">
   <h2>Régie</h2>
+  <div class="row" style="margin-top:0"><button id="openRegie" title="Ouvre la régie dans une autre fenêtre, pour piloter depuis l'écran de l'ordinateur pendant que la scène est projetée">Régie dans une fenêtre (G)</button></div>
+  <label>Configuration</label>
+  <select id="preset"></select>
+  <div class="row">
+    <div style="flex:1"><label style="margin-top:0">Durée d'une session</label><select id="sessionMin"><option value="0">Libre</option><option value="3">3 minutes</option><option value="5">5 minutes</option><option value="8">8 minutes</option><option value="10">10 minutes</option></select></div>
+  </div>
+  <div class="row"><button id="sessNew">Nouvelle session</button><button id="sessEnd">Final</button></div>
+  <label class="check"><input id="hintsOn" type="checkbox"> Consignes de jeu à l'écran</label>
   <label>Mode</label>
   <select id="mode"><option value="trio">Scène à trois (gauche, centre, droite)</option><option value="group">Petit groupe (1 à 5 personnes suivies)</option><option value="crowd">Foule (secteurs de l'espace)</option></select>
   <label>Caméra</label>
@@ -153,6 +191,9 @@
     <div class="row">
       <button data-p="3" data-g="Trio">Synchro</button><button data-p="4">Frénésie</button><button data-p="5" title="Chacun son tour">Tournée</button>
     </div>
+    <div class="row groupOnlyAll">
+      <button data-p="6" title="Geste collectif : montée puis grande frappe">Mains en l'air</button><button data-p="7" title="Geste collectif : silence, puis reprise">Silence</button>
+    </div>
     <div class="row"><button id="jump">Saut collectif</button></div>
   </div>
   <h3 class="crowdOnly">Secteurs et instruments</h3>
@@ -171,21 +212,32 @@
     <input id="importFile" type="file" accept="application/json,.json" hidden>
   </div>
   <p class="keys"><kbd>H</kbd> régie · <kbd>D</kbd> debug · <kbd>F</kbd> plein écran · <kbd>S</kbd> simulation · <kbd>R</kbd> recalibrer<br>
-  Simulation : <kbd>0</kbd>–<kbd>5</kbd> comportements, <kbd>Espace</kbd> saut collectif, souris = mouvement</p>
+  Simulation : <kbd>0</kbd>–<kbd>7</kbd> comportements, <kbd>Espace</kbd> saut collectif, souris = mouvement</p>
 </aside>
 
+<div id="hint"></div>
+<div id="cfg"></div>
+<div id="clock"></div>
+<div id="end"><b>Merci</b><small>Place aux suivants</small></div>
+
 <div id="start">
-  <div>
-    <p class="eyebrow">Assemblée créative de Genève · Downtown Studio</p>
-    <h1>Foule Sonore</h1>
-    <p class="tag"><i style="color:var(--p1)">Imaginons</i> <i style="color:var(--p2)">la Créature</i> <i style="color:var(--p3)">ensemble</i></p>
-    <div id="modes"><button data-mode="trio">Scène à trois</button><button data-mode="group">Petit groupe</button><button data-mode="crowd">Foule</button></div>
-    <p class="trioOnly">Trois personnes, trois places, trois instruments : à gauche, au centre, à droite. Chacune joue le sien avec tout le corps, et c'est ensemble qu'elles réveillent la Créature. La caméra sert uniquement à suivre les gestes : aucune image n'est affichée, enregistrée ni envoyée.</p>
-    <p class="crowdOnly">Le mouvement de la foule devient musique et lumière. La caméra sert uniquement à mesurer le mouvement : aucune image n'est affichée, enregistrée ni envoyée.</p>
-    <p class="groupOnly">De 1 à 5 personnes : chacune devient un instrument, joué avec tout le corps. La caméra sert uniquement à suivre les gestes : aucune image n'est affichée, enregistrée ni envoyée.</p>
-    <button id="btnStart">Démarrer avec la caméra</button>
-    <button id="btnSim" class="alt">Tester sans caméra (simulation)</button>
-  </div>
+  <p class="eyebrow">Assemblée créative de Genève · Downtown Studio · 19 novembre 2026</p>
+  <h1>Foule Sonore</h1>
+  <p class="tag">Imaginons la Créature ensemble</p>
+  <h4>Choisir un voyage</h4>
+  <div id="presetPick"></div>
+  <h4>Comment jouer</h4>
+  <ul id="how">
+    <li><b>Bouger</b>Chaque geste joue une note. Plus vite, le rythme se resserre.</li>
+    <li><b>Lever les mains</b>Mains hautes, le son monte dans l'aigu. Mains basses, il descend.</li>
+    <li><b>Ouvrir les bras</b>Le son s'éclaircit et résonne. Bras serrés, il se feutre.</li>
+    <li class="trioOnly"><b>Changer de place</b>Gauche, centre, droite : trois instruments. On passe de l'un à l'autre.</li>
+    <li class="groupOnly"><b>Sauter</b>Un saut donne un accent.</li>
+    <li><b>Ensemble</b>Tous les mains en l'air, ou tous immobiles d'un coup : la musique répond.</li>
+  </ul>
+  <div id="go"><button id="btnStart">Démarrer avec la caméra</button><button id="btnSim">Essayer sans caméra</button></div>
+  <div id="modes"><button data-mode="trio">Scène à trois</button><button data-mode="group">Petit groupe</button><button data-mode="crowd">Foule</button></div>
+  <p class="fine">La caméra sert uniquement à suivre les gestes : aucune image n'est affichée, enregistrée ni envoyée. <kbd>H</kbd> réglages · <kbd>G</kbd> régie dans une autre fenêtre · <kbd>F</kbd> plein écran</p>
 </div>
 <script type="module" src="js/main.js"></script>
 </body>

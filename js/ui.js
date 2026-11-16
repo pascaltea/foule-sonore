@@ -1,7 +1,8 @@
 // Régie : panneau de réglages, éditeur de secteurs, raccourcis clavier, jauge, affichage debug.
 import { GW, GH, GN, MAX_SECTORS, SECTOR_COLORS, ZONES, LAYOUTS, makeLayout, sanitizeSectors, rebuildSectorMap,
   state, settings, saveSettings, clamp, setMode, configOf, setConfig, sanitizePlayers, playersConfig, trio } from './state.js';
-import { SCALES, KEYS, INSTRUMENTS } from './music.js';
+import { SCALES, KEYS, INSTRUMENTS, PRESETS } from './music.js';
+import { endSession, newSession } from './metrics.js';
 import { PALETTES } from './visuals.js';
 import * as capture from './capture.js';
 import { slots, BONES, status as poseStatus, reset as resetPose } from './pose.js';
@@ -11,7 +12,7 @@ let handlers = {}, noteTimer = 0;
 const HL = 360, hE = new Float32Array(HL), hS = new Float32Array(HL), hC = new Float32Array(HL), hG = new Float32Array(HL);
 let hp = 0;
 const CELL = 6, OX = 8, OY = 8;        // géométrie de la grille dans le canvas debug
-let sel = -1, drag = null;
+let sel = -1, drag = null, cfgShown = 0, hintIdx = 0, hintCycle = -1;
 const modeKey = () => (settings.mode === 'crowd' ? 'crowd' : settings.zones ? 'trio' : 'group');
 const INVITE = {
   trio: ['Réveillons la Créature', 'Trois places, trois instruments'],
@@ -51,6 +52,9 @@ function sync() {
   $('mode').value = mk;
   document.querySelectorAll('[data-mode]').forEach((b) => b.classList.toggle('active', b.dataset.mode === mk));
   $('invite').firstElementChild.textContent = INVITE[mk][0]; $('invite').lastElementChild.textContent = INVITE[mk][1];
+  $('preset').value = settings.preset; $('sessionMin').value = settings.sessionMin; $('hintsOn').checked = settings.hints;
+  document.querySelectorAll('[data-preset]').forEach((b) => b.classList.toggle('active', b.dataset.preset === settings.preset && !settings.custom));
+  $('cfg').textContent = (PRESETS[settings.preset]?.name || '') + (settings.custom ? ' · libre' : '');
   $('creatureOn').checked = settings.creature; $('gauge').style.display = settings.creature ? 'none' : '';
   document.querySelectorAll('[data-g]').forEach((b) => { b.dataset.c ??= b.textContent; b.textContent = group ? b.dataset.g : b.dataset.c; });
   $('showSec').checked = settings.showSectors;
@@ -102,6 +106,7 @@ function onSectorInput(e) {
   else if (f === 'vol') s.vol = +e.target.value;
   else if (f === 'name') s.name = e.target.value;
   else { s[f] = e.target.value; if (f === 'color') row.style.borderLeftColor = s.color; }
+  if (f === 'inst') { settings.custom = true; sync(); }
   sectorsChanged(false);       // la liste n'est pas reconstruite pendant la saisie
 }
 
@@ -160,7 +165,7 @@ function deleteSelected() {
 }
 
 // ---------- Export / import de la configuration ----------
-const CFG_KEYS = ['sensitivity', 'scale', 'key', 'volume', 'palette', 'dramaSpeed', 'showSectors', 'zones', 'creature'];
+const CFG_KEYS = ['sensitivity', 'scale', 'key', 'volume', 'palette', 'dramaSpeed', 'showSectors', 'zones', 'creature', 'preset', 'custom', 'sessionMin', 'hints'];
 function exportConfig() {
   const cfg = { type: 'foule-sonore', version: 4, sectors: configOf('crowd'), players: playersConfig() };
   CFG_KEYS.forEach((k) => { cfg[k] = settings[k]; });
@@ -183,6 +188,10 @@ export function applyConfig(cfg) {
   settings.showSectors = !!cfg.showSectors;
   if ('zones' in cfg) settings.zones = !!cfg.zones;
   if ('creature' in cfg) settings.creature = !!cfg.creature;
+  if (PRESETS[cfg.preset]) settings.preset = cfg.preset;
+  if ('custom' in cfg) settings.custom = !!cfg.custom;
+  if (cfg.sessionMin >= 0) settings.sessionMin = clamp(+cfg.sessionMin, 0, 30);
+  if ('hints' in cfg) settings.hints = !!cfg.hints;
   resetPose();
   sel = -1;
   $('scale').value = settings.scale; $('key').value = settings.key; $('palette').value = settings.palette;
@@ -196,6 +205,53 @@ async function importConfig(e) {
   if (!file) return;
   try { applyConfig(JSON.parse(await file.text())); note('Configuration importée.', 3000); }
   catch { note('Fichier de configuration illisible.', 5000); }
+}
+
+// ---------- Configurations d'instruments ----------
+// Applique un trio complet à chaud : instruments, gamme, tonalité (le tempo et la grille suivent dans music.js).
+export function applyPreset(id) {
+  const p = PRESETS[id];
+  if (!p) return;
+  settings.preset = id; settings.custom = false; settings.scale = p.scale; settings.key = p.key;
+  for (const mode of ['group', 'crowd']) p.insts.forEach((k, i) => { const s = configOf(mode)[i]; if (s) s.inst = k; });
+  $('scale').value = settings.scale; $('key').value = settings.key;
+  cfgShown = performance.now();
+  sectorsChanged(); sync();
+}
+export const presetLine = (id = settings.preset) => { const p = PRESETS[id]; return p ? `${p.name} · ${p.insts.map((k) => INSTRUMENTS[k]).join(', ')}` : ''; };
+function openRegie() { window.open('regie.html', 'foule-regie', 'width=540,height=900'); }
+
+// ---------- Régie à distance (autre fenêtre du même navigateur, voir remote.js) ----------
+const REMOTE_SET = { volume: [0, 1], sensitivity: [0.3, 4], dramaSpeed: [0.25, 6], sessionMin: [0, 30], key: [0, 11] };
+export function remoteHello() {
+  return { presets: Object.entries(PRESETS).map(([id, p]) => ({ id, name: p.name, sub: p.sub, insts: p.insts.map((k) => INSTRUMENTS[k]) })),
+    instruments: INSTRUMENTS, scales: Object.fromEntries(Object.entries(SCALES).map(([k, s]) => [k, s.label])), keys: KEYS };
+}
+export function remoteState() {
+  const d = state.drama, ss = state.session, n = trio() ? ZONES : settings.sectors.length;
+  return {
+    preset: settings.preset, custom: settings.custom, mode: settings.mode === 'crowd' ? 'crowd' : settings.zones ? 'trio' : 'group', running: state.music.running,
+    places: settings.sectors.slice(0, n).map((s, i) => ({ name: s.name, inst: s.inst, vol: s.vol, mute: s.mute, present: s.present !== false, on: state.sec[i].on, energy: +state.sec[i].energy.toFixed(2) })),
+    gauge: +d.gauge.toFixed(3), phase: d.phase, attract: d.attract, hush: d.hush, lift: +d.lift.toFixed(2), bpm: Math.round(state.music.bpm),
+    session: { on: ss.on, t: Math.floor(ss.t), ended: ss.ended > 0 },
+    set: { volume: settings.volume, sensitivity: settings.sensitivity, dramaSpeed: settings.dramaSpeed, sessionMin: settings.sessionMin, scale: settings.scale, key: settings.key, hints: settings.hints, simulate: settings.simulate },
+  };
+}
+export function remoteApply(m) {
+  const s = settings.sectors[m.i];
+  if (m.type === 'preset') applyPreset(m.id);
+  else if (m.type === 'inst' && s && INSTRUMENTS[m.inst]) { s.inst = m.inst; settings.custom = true; sectorsChanged(); sync(); }
+  else if (m.type === 'vol' && s) { s.vol = clamp(+m.v, 0, 1.5); sectorsChanged(); }
+  else if (m.type === 'mute' && s) { s.mute = !!m.v; sectorsChanged(); }
+  else if (m.type === 'set' && REMOTE_SET[m.key]) { const [a, b] = REMOTE_SET[m.key]; settings[m.key] = m.key === 'key' ? Math.round(clamp(+m.value, a, b)) : clamp(+m.value, a, b); syncInputs(); sync(); }
+  else if (m.type === 'set' && m.key === 'scale' && SCALES[m.value]) { settings.scale = m.value; syncInputs(); sync(); }
+  else if (m.type === 'set' && m.key === 'hints') { settings.hints = !!m.value; sync(); }
+  else if (m.type === 'cmd' && m.name === 'end') endSession();
+  else if (m.type === 'cmd' && m.name === 'new') newSession();
+}
+function syncInputs() {
+  $('scale').value = settings.scale; $('key').value = settings.key;
+  $('sens').value = settings.sensitivity; $('vol').value = settings.volume; $('drama').value = settings.dramaSpeed;
 }
 
 export function changeMode(mode) {
@@ -218,6 +274,13 @@ export function init(h) {
   fill($('scale'), Object.entries(SCALES).map(([k, s]) => [k, s.label]), settings.scale);
   fill($('key'), KEYS.map((k, i) => [i, k]), settings.key);
   fill($('palette'), Object.entries(PALETTES).map(([k, p]) => [k, p.label]), settings.palette);
+  fill($('preset'), Object.entries(PRESETS).map(([k, p]) => [k, `${p.name} · ${p.insts.map((i) => INSTRUMENTS[i]).join(', ')}`]), settings.preset);
+  $('presetPick').innerHTML = Object.entries(PRESETS).map(([k, p]) => `<button data-preset="${k}"><b>${esc(p.name)}</b><i>${esc(p.sub)}</i><span>${p.insts.map((i) => esc(INSTRUMENTS[i]).replace(/ \(.*\)/, '')).join('<br>')}</span></button>`).join('');
+  document.querySelectorAll('[data-preset]').forEach((b) => { b.onclick = () => applyPreset(b.dataset.preset); });
+  $('preset').onchange = (e) => applyPreset(e.target.value);
+  $('sessionMin').onchange = (e) => { settings.sessionMin = +e.target.value; sync(); };
+  $('hintsOn').onchange = (e) => { settings.hints = e.target.checked; sync(); };
+  $('sessNew').onclick = newSession; $('sessEnd').onclick = endSession; $('openRegie').onclick = openRegie;
   fill($('layout'), [['', 'Personnalisé'], ...Object.entries(LAYOUTS).map(([k, l]) => [k, l.label])], '');
   $('sens').value = settings.sensitivity; $('vol').value = settings.volume; $('drama').value = settings.dramaSpeed;
 
@@ -262,7 +325,8 @@ export function init(h) {
     else if (k === 'f') fullscreen();
     else if (k === 's') setSim(!settings.simulate);
     else if (k === 'r') capture.recalibrate();
-    else if (k >= '0' && k <= '5') { settings.simPreset = +k; sync(); }
+    else if (k >= '0' && k <= '7') { settings.simPreset = +k; sync(); }
+    else if (k === 'g') openRegie();
     else if (k === ' ') { e.preventDefault(); capture.simJump(); }
     else if ((k === 'delete' || k === 'backspace') && settings.debug) deleteSelected();
   });
@@ -342,8 +406,42 @@ function drawDebug() {
   line(3, '#999', `${state.perf.fps.toFixed(0)} i/s · qualité ${state.perf.quality} · ${settings.simulate ? 'simulation' : state.capture.mode}   niveau ${mu.level.toFixed(3)}`);
 }
 
+// Consignes au public : une ligne discrète qui change toutes les 11 s, choisie selon ce qui se passe sur scène.
+function hintList() {
+  const ss = state.session, group = settings.mode === 'group', L = [];
+  const n = group ? settings.sectors.filter((s) => s.present).length : 0;
+  if (settings.sessionMin && ss.on && settings.sessionMin * 60 - ss.t < 35) return ['Dernières secondes : tous ensemble'];
+  if (!group) return ['Bougez ensemble', 'Plus vous bougez ensemble, plus ça monte'];
+  if (ss.t < 45) L.push('Bougez pour jouer', 'Mains hautes : aigu · mains basses : grave', 'Ouvrez les bras : le son s\'ouvre');
+  else L.push('Gestes rapides : le rythme se resserre', 'Ouvrez les bras : le son s\'ouvre', 'Un saut : un accent');
+  if (trio()) L.push('Changez de place : changez d\'instrument');
+  if (n >= 2) L.push('Levez tous les mains en même temps, et tenez', 'Figez-vous tous ensemble, puis repartez');
+  if (trio() && n > 0 && n < ZONES) L.push('Il reste une place : à trois, tout s\'éveille');
+  return L;
+}
+function updateHints(now) {
+  const d = state.drama, ss = state.session, el = $('hint');
+  let txt = '', on = false;
+  if (ss.ended > 0 || !state.music.running) { /* rien */ }
+  else if (now - cfgShown < 6000 && cfgShown) { txt = presetLine(); on = true; }
+  else if (d.lift > 0.2) { txt = 'Tenez…'; on = true; }
+  else if (settings.hints && !d.attract && !d.hush) {
+    const cyc = Math.floor(now / 11000);
+    if (cyc !== hintCycle) { hintCycle = cyc; hintIdx++; }
+    const L = hintList();
+    txt = L[hintIdx % L.length]; on = now % 11000 < 7000;
+  }
+  if (on && el.textContent !== txt) el.textContent = txt;
+  el.classList.toggle('on', on);
+  $('end').classList.toggle('on', ss.ended > 0);
+  const dur = settings.sessionMin * 60;
+  $('clock').style.width = (ss.on && dur && ss.ended === 0 ? clamp(ss.t / dur) * 100 : 0) + '%';
+  $('cfg').classList.toggle('on', state.music.running && !d.attract);
+}
+
 export function update() {
   const d = state.drama, m = state.m, c = state.capture;
+  updateHints(performance.now());
   hE[hp] = m.energy; hS[hp] = m.speed; hC[hp] = m.coherence; hG[hp] = d.gauge; hp = (hp + 1) % HL;
   $('gaugeFill').style.width = (d.gauge * 100).toFixed(1) + '%';
   $('gauge').classList.toggle('climax', d.phase === 'climax');

@@ -41,12 +41,13 @@ export function render(dt, t) {
   if (!g) return;
   resize();
   g.clearRect(0, 0, W, H);
-  if (!settings.creature || !state.music.running) return;
+  if (!settings.creature) return;
+  const idle = !state.music.running;           // écran d'accueil : le dôme attend, à demi levé
   const d = state.drama, m = state.m, mu = state.music;
   const climax = d.phase === 'climax', sleeping = d.attract, { ink } = actColors();
 
-  rise = smooth(rise, sleeping ? 0 : d.gauge, dt, 0.9, 1.6);
-  glow = smooth(glow, sleeping ? 0.12 : climax ? 1 : 0.2 + 0.6 * d.gauge + 0.2 * clamp(m.energy), dt, 0.6, 1.4);
+  rise = smooth(rise, idle ? 0.3 + 0.02 * Math.sin(t * 0.7) : sleeping ? 0 : d.gauge, dt, 0.9, 1.6);
+  glow = smooth(glow, idle ? 0.42 + 0.08 * Math.sin(t * 0.7) : d.hush ? 0.08 : sleeping ? 0.12 : d.lift > 0 ? 0.5 + 0.5 * d.lift : climax ? 1 : 0.2 + 0.6 * d.gauge + 0.2 * clamp(m.energy), dt, 0.6, 1.4);
   eyes = smooth(eyes, climax ? 1 : clamp((d.gauge - 0.66) / 0.3), dt, 0.5, 1.2);
   if (mu.accentCount !== lastAccent) { lastAccent = mu.accentCount; hop = 1; }
   hop *= Math.exp(-dt * 3.5);

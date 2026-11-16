@@ -18,6 +18,42 @@ Dans les deux premiers modes, bouger joue, lever les mains monte dans l'aigu, de
 
 Le mode se choisit sur l'écran de démarrage ou dans la régie. Noms, couleurs et instruments des places se changent dans la régie.
 
+## Six voyages
+
+Une configuration (un « voyage ») règle d'un coup les trois instruments, la gamme, la tonalité et la plage de tempo. Les trios sont pensés pour sonner ensemble dès la première note : rythme à gauche, harmonie au centre, chant à droite. Tous les sons sont synthétisés.
+
+| Voyage | Gauche | Centre | Droite | Gamme |
+|---|---|---|---|---|
+| Genève | Batterie | Piano | Violon | Pentatonique mineure |
+| Mali | Djembé | Balafon | Kora | Pentatonique majeure |
+| Inde | Tabla | Sitar | Bansuri | Yaman |
+| Japon | Taïko | Koto | Shakuhachi | Hirajoshi |
+| Levant | Darbouka | Oud | Ney | Hijaz |
+| Caraïbes | Congas | Basse | Steel pan | Majeure |
+
+Chaque instrument peut aussi être choisi librement, place par place.
+
+## Jouer
+
+| Geste | Effet |
+|---|---|
+| Bouger | joue ; plus on bouge, plus il y a de notes |
+| Gestes rapides | le rythme se resserre |
+| Mains hautes ou basses | registre aigu ou grave |
+| Bras ouverts ou serrés | son clair et résonnant, ou feutré |
+| Sauter | un accent |
+| Changer de place | changer d'instrument |
+| Tous les mains en l'air, tenues 2 s | montée, puis grande frappe ; la jauge gagne un cran |
+| Tous immobiles d'un coup | silence ; la reprise claque |
+
+Les deux derniers gestes demandent d'être au moins deux. Des consignes discrètes s'affichent à l'écran pendant la session.
+
+## Session et régie
+
+Une session démarre au premier mouvement et dure 5 minutes par défaut (réglable, ou libre). La dernière demi-minute monte plus vite, puis un accord final s'éteint et l'écran invite les suivants.
+
+La régie s'ouvre dans une autre fenêtre du même navigateur (touche `G`, ou `regie.html`) : on la garde sur l'écran de l'ordinateur pendant que la scène est projetée. Elle change de voyage en direct (touches `1` à `6`), choisit les instruments, règle volumes, durée et sensibilité, lance le final. Aucun serveur : les deux fenêtres doivent être dans le même navigateur, sur la même machine.
+
 ## Principe
 
 - **Captation** : flux optique sur une grille 64×36, d'où sont tirées énergie, vitesse, cohérence et pulsation de la foule.
@@ -38,12 +74,13 @@ Puis ouvrir `http://localhost:8765` dans Chrome.
 
 | Touche | Action |
 |---|---|
-| `H` | afficher / masquer la régie |
+| `H` | afficher / masquer les réglages |
+| `G` | ouvrir la régie dans une autre fenêtre |
 | `D` | debug et éditeur de secteurs |
 | `F` | plein écran |
 | `S` | mode simulation (sans caméra) |
 | `R` | recalibrer (10 s, champ vide) |
-| `0`–`5` | comportements simulés (`3` = trio), `Espace` saut collectif |
+| `0`–`7` | comportements simulés (`3` trio, `6` mains en l'air, `7` silence), `Espace` saut collectif |
 
 Les réglages sont mémorisés dans le navigateur ; les boutons Exporter / Importer de la régie permettent de les transporter d'une machine à l'autre.
 

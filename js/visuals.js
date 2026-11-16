@@ -207,7 +207,7 @@ export function render(dt, t) {
   gl.vertexAttribPointer(0, 4, gl.FLOAT, false, 0, 0);
   const pulse = d.tier > 0 || attract ? mu.beatPulse : mu.beatPulse * 0.4;
   gl.uniform1f(pP.u.size, fh / 1080 * 2.4 * (1 + 0.5 * pulse));
-  gl.uniform1f(pP.u.bright, (attract ? 0.22 : (0.07 + 0.13 * m.energy) * (d.tier >= 2 ? 0.55 : 1)) * (1 + 0.5 * pulse) + 0.1 * mu.accent);
+  gl.uniform1f(pP.u.bright, (d.hush ? 0.25 : state.session.ended > 0 ? 0.2 : 1) * (attract ? 0.22 : (0.07 + 0.13 * m.energy) * (d.tier >= 2 ? 0.55 : 1)) * (1 + 0.5 * pulse) + 0.1 * mu.accent);
   gl.uniform1f(pP.u.harm, harm);
   secU.fill(0);
   settings.sectors.forEach((s, i) => {
