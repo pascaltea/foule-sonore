@@ -8,6 +8,7 @@ import * as visuals from './visuals.js';
 import * as creature from './creature.js';
 import * as ui from './ui.js';
 import * as remote from './remote.js';
+import * as journey from './journey.js';
 
 let last = performance.now(), lowT = 0, highT = 0, glOk = true;
 
@@ -67,6 +68,7 @@ function pipeline(dt, t) {
   pose.update(dt);
   updateMetrics(dt);
   updateDrama(dt);
+  journey.update(dt);
   music.update(dt);
   if (glOk) visuals.render(dt, t);
   creature.render(dt, t);

@@ -158,8 +158,14 @@ const drum = (t, f, vol, dest, decay = 0.12) => {      // peau accordée : conga
   voice({ f, fFrom: f * 1.7, glide: 0.035, t, dur: 0.01, vol, dest, a: 0.002, r: decay });
   noise({ t, vol: vol * 0.25, dest, type: 'bandpass', f: f * 6, q: 1, r: 0.012 });
 };
+// Une frappe grave ne vit pas que dans l'extrême grave : on lui ajoute son octave et un claquement d'attaque, pour
+// qu'elle reste présente sur de petites enceintes.
+function thump(t, f, vol, dest, decay, click = 1800) {
+  voice({ type: 'triangle', f: f * 2, fFrom: f * 4, glide: 0.05, t, dur: 0.012, vol: vol * 0.55, dest, a: 0.002, r: decay * 0.55 });
+  noise({ t, vol: vol * 0.4, dest, type: 'bandpass', f: click, q: 0.9, r: 0.012 });
+}
 function kick(t, vol, dest, pump) {
-  voice({ f: 46, fFrom: 160, glide: 0.1, t, dur: 0.02, vol, dest, a: 0.002, r: 0.11 });
+  voice({ f: 52, fFrom: 160, glide: 0.1, t, dur: 0.02, vol, dest, a: 0.002, r: 0.11 }); thump(t, 52, vol, dest, 0.11, 2200);
   if (pump) { duck.gain.setTargetAtTime(0.5, t, 0.006); duck.gain.setTargetAtTime(1, t + 0.06, 0.09); }
 }
 const snare = (t, vol, dest) => {
@@ -444,21 +450,22 @@ function mel(label, level, rev, dly, oct, one, extra = {}) {
 
 Object.assign(INST, {
   djembe: perc('Djembé', 1.25, { 0: 'B...T...B.t.T...', 1: 'B.tSB.T.B.tSt.T.', 2: 'B.tSBtTsB.tSTtTs', u: 'BS', g: 'T' }, {
-    B: (x, v) => { voice({ f: 72, fFrom: 130, glide: 0.05, t: x.t, dur: 0.02, vol: 0.9 * v, dest: x.d, a: 0.002, r: 0.13 }); },
+    B: (x, v) => { voice({ f: 78, fFrom: 135, glide: 0.05, t: x.t, dur: 0.02, vol: 0.9 * v, dest: x.d, a: 0.002, r: 0.13 }); thump(x.t, 78, 0.8 * v, x.d, 0.13, 1200); },
     T: (x, v) => drum(x.t, 235, 0.55 * v, x.d, 0.07),
     S: (x, v) => { tap(x.t, 0.6 * v, x.d, 2600, 0.9, 0.02); voice({ f: 430, t: x.t, dur: 0.004, vol: 0.25 * v, dest: x.d, r: 0.02 }); },
   }),
   tabla: perc('Tabla', 1.25, { 0: 'D...N...D...N.t.', 1: 'D.t.N.t.G.N.N.tt', 2: 'D.tNt.NtG.tNtNtt', u: 'DN', g: 'T' }, (() => {
-    const G = (x, v) => voice({ f: 84, fFrom: 58, glide: 0.11, t: x.t, dur: 0.05, vol: 0.85 * v, dest: x.d, a: 0.003, r: 0.13 });
+    const G = (x, v) => { voice({ f: 84, fFrom: 58, glide: 0.11, t: x.t, dur: 0.05, vol: 0.85 * v, dest: x.d, a: 0.003, r: 0.13 }); voice({ type: 'triangle', f: 168, fFrom: 116, glide: 0.11, t: x.t, dur: 0.04, vol: 0.4 * v, dest: x.d, a: 0.003, r: 0.09 }); };
     const N = (x, v) => { const f = mtof(x.base + 36); voice({ f, t: x.t, dur: 0.006, vol: 0.4 * v, dest: x.d, a: 0.001, r: 0.15 }); voice({ f: f * 2.01, t: x.t, dur: 0.004, vol: 0.14 * v, dest: x.d, a: 0.001, r: 0.08 }); tap(x.t, 0.2 * v, x.d, 4000, 2, 0.006); };
     return { G, N, T: (x, v) => tap(x.t, 0.4 * v, x.d, 1900, 2.5, 0.009), D: (x, v) => { G(x, v); N(x, v); } };
   })()),
-  taiko: perc('Taïko', 0.7, { 0: 'D.......D...k...', 1: 'D...k.k.D.d.k...', 2: 'D.k.D.kkD.d.DkDk', u: 'DK', g: 'K' }, {
-    D: (x, v) => { voice({ f: 52, fFrom: 115, glide: 0.08, t: x.t, dur: 0.03, vol: v, dest: x.d, a: 0.002, r: 0.3 }); noise({ t: x.t, vol: 0.3 * v, dest: x.d, type: 'lowpass', f: 900, r: 0.03 }); },
-    K: (x, v) => { tap(x.t, 0.5 * v, x.d, 2300, 3, 0.01); voice({ f: 880, t: x.t, dur: 0.003, vol: 0.2 * v, dest: x.d, r: 0.015 }); },
+  taiko: perc('Taïko', 1.15, { 0: 'D.......D...k...', 1: 'D...k.k.D.d.k...', 2: 'D.k.D.kkD.d.DkDk', u: 'DK', g: 'K' }, {
+    // Grand tambour : une peau grave, son octave qui porte, et le bois de la baguette.
+    D: (x, v) => { voice({ f: 68, fFrom: 140, glide: 0.07, t: x.t, dur: 0.03, vol: v, dest: x.d, a: 0.002, r: 0.3 }); thump(x.t, 68, 1.1 * v, x.d, 0.3, 1500); noise({ t: x.t, vol: 0.4 * v, dest: x.d, type: 'lowpass', f: 1400, r: 0.035 }); },
+    K: (x, v) => { tap(x.t, 0.8 * v, x.d, 2300, 3, 0.012); voice({ f: 880, t: x.t, dur: 0.003, vol: 0.32 * v, dest: x.d, r: 0.018 }); },
   }),
   darbuka: perc('Darbouka', 1.8, { 0: 'D.T...T.D...T...', 1: 'D.T.k.T.D.k.T.k.', 2: 'D.TkkkT.DkkkT.Tk', u: 'DT', g: 'K' }, {
-    D: (x, v) => drum(x.t, 96, 0.9 * v, x.d, 0.11),
+    D: (x, v) => { drum(x.t, 96, 0.9 * v, x.d, 0.11); thump(x.t, 96, 0.6 * v, x.d, 0.11, 1300); },
     T: (x, v) => { tap(x.t, 0.6 * v, x.d, 3800, 1.5, 0.018); voice({ f: 640, t: x.t, dur: 0.004, vol: 0.22 * v, dest: x.d, r: 0.02 }); },
     K: (x, v) => tap(x.t, 0.38 * v, x.d, 4600, 2, 0.01),
   }),
@@ -491,12 +498,12 @@ Object.assign(INST, {
 // Configurations : des trios pensés pour sonner ensemble dès la première note (rythme à gauche, harmonie au centre,
 // chant à droite), chacun avec sa gamme, sa tonalité, sa plage de tempo et, au besoin, sa propre grille d'accords.
 export const PRESETS = {
-  geneve: { name: 'Genève', sub: 'le studio', insts: ['drums', 'piano', 'violin'], scale: 'pentaMin', key: 9, bpm: [72, 132] },
-  mali: { name: 'Mali', sub: 'Afrique de l\'Ouest', insts: ['djembe', 'balafon', 'kora'], scale: 'pentaMaj', key: 5, bpm: [86, 132] },
-  inde: { name: 'Inde', sub: 'raga du soir', insts: ['tabla', 'sitar', 'bansuri'], scale: 'yaman', key: 2, bpm: [66, 124], prog: [0, 0, 0, 0] },
-  japon: { name: 'Japon', sub: 'gamme hirajoshi', insts: ['taiko', 'koto', 'shakuhachi'], scale: 'hirajoshi', key: 2, bpm: [60, 110], prog: [0, 0, 3, 0] },
-  levant: { name: 'Levant', sub: 'maqam hijaz', insts: ['darbuka', 'oud', 'ney'], scale: 'hijaz', key: 2, bpm: [76, 128], prog: [0, 0, 3, 0] },
-  caraibes: { name: 'Caraïbes', sub: 'Trinité', insts: ['congas', 'bass', 'steelpan'], scale: 'majeur', key: 0, bpm: [90, 128], prog: [0, 3, 4, 0] },
+  geneve: { name: 'Genève', sub: 'le studio', insts: ['drums', 'piano', 'violin'], scale: 'pentaMin', key: 9, bpm: [72, 132], ink: [0.03, 0.6, 0.36] },
+  mali: { name: 'Mali', sub: 'Afrique de l\'Ouest', insts: ['djembe', 'balafon', 'kora'], scale: 'pentaMaj', key: 5, bpm: [86, 132], ink: [1, 0.46, 0.04] },
+  inde: { name: 'Inde', sub: 'raga du soir', insts: ['tabla', 'sitar', 'bansuri'], scale: 'yaman', key: 2, bpm: [66, 124], prog: [0, 0, 0, 0], ink: [0.95, 0.36, 0.9] },
+  japon: { name: 'Japon', sub: 'gamme hirajoshi', insts: ['taiko', 'koto', 'shakuhachi'], scale: 'hirajoshi', key: 2, bpm: [60, 110], prog: [0, 0, 3, 0], ink: [0.8, 0.85, 0.96] },
+  levant: { name: 'Levant', sub: 'maqam hijaz', insts: ['darbuka', 'oud', 'ney'], scale: 'hijaz', key: 2, bpm: [76, 128], prog: [0, 0, 3, 0], ink: [0.04, 0.5, 0.86] },
+  caraibes: { name: 'Caraïbes', sub: 'Trinité', insts: ['congas', 'bass', 'steelpan'], scale: 'majeur', key: 0, bpm: [90, 128], prog: [0, 3, 4, 0], ink: [1, 0.93, 0.3] },
 };
 export const INSTRUMENTS = Object.fromEntries(Object.entries(INST).map(([k, v]) => [k, v.label]));
 

@@ -45,7 +45,7 @@
 <header><h1>Régie</h1><span id="link">Connexion…</span></header>
 <div id="status"><div id="time">0:00</div><div id="what"></div><div id="bar"><i></i></div></div>
 
-<h2>Voyages · touches 1 à 6</h2>
+<h2>Escales · touches 1 à 6</h2>
 <div id="presets"></div>
 
 <h2>Instruments par place</h2>
@@ -56,7 +56,9 @@
   <div><label>Durée</label><select id="sessionMin"><option value="0">Libre</option><option value="3">3 minutes</option><option value="5">5 minutes</option><option value="8">8 minutes</option><option value="10">10 minutes</option></select></div>
   <div><label>Vitesse de la montée <span id="vDrama"></span></label><input id="dramaSpeed" type="range" min="0.25" max="6" step="0.25"></div>
 </div>
+<div class="row"><button id="next">Escale suivante (Espace)</button></div>
 <div class="row"><button id="new">Nouvelle session (N)</button><button id="end">Final (Entrée)</button></div>
+<label class="check"><input id="journey" type="checkbox"> Voyage : départ et retour à Genève</label>
 <label class="check"><input id="hints" type="checkbox"> Invitations à l'écran</label>
 
 <h2>Son</h2>
@@ -110,14 +112,14 @@ function render() {
     row.querySelector('[data-f=mute]').classList.toggle('active', p.mute);
   });
   for (const k of ['volume', 'sensitivity', 'dramaSpeed', 'sessionMin', 'scale', 'key']) if (idle($(k))) $(k).value = st.set[k];
-  $('hints').checked = st.set.hints;
+  $('hints').checked = st.set.hints; $('journey').checked = st.set.journey;
   $('vVol').textContent = Math.round(st.set.volume * 100) + ' %'; $('vSens').textContent = (+st.set.sensitivity).toFixed(2); $('vDrama').textContent = '×' + st.set.dramaSpeed;
   const t = st.session.t, dur = st.set.sessionMin * 60;
   $('time').textContent = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}` + (dur ? ` / ${st.set.sessionMin}:00` : '');
   $('bar').firstElementChild.style.width = (dur ? Math.min(1, t / dur) * 100 : 0) + '%';
   const n = st.places.filter((p) => p.on).length;
   $('what').innerHTML = !st.running ? 'Scène pas encore démarrée' : st.session.ended ? 'Final en cours' : st.attract ? 'En attente de joueurs' :
-    `${n} en jeu · ${st.bpm} BPM · montée ${Math.round(st.gauge * 100)} %${st.phase === 'climax' ? ' · éveil' : ''}${st.hush ? ' · silence' : ''}${st.lift > 0 ? ' · mains en l\'air' : ''}${st.set.simulate ? ' · simulation' : ''}`;
+    `${n} en jeu · ${st.bpm} BPM · montée ${Math.round(st.gauge * 100)} %${st.phase === 'climax' ? ' · éveil' : ''}${st.hush ? ' · silence' : ''}${st.lift > 0 ? ' · mains en l\'air' : ''}${st.set.simulate ? ' · simulation' : ''}${st.stops?.length ? '<br>' + st.stops.map(esc).join(' → ') : ''}`;
 }
 function receive(m) {
   if (!m || m.from !== 'stage') return;
@@ -148,6 +150,8 @@ for (const k of ['volume', 'sensitivity', 'dramaSpeed']) $(k).oninput = (e) => s
 for (const k of ['sessionMin', 'key']) $(k).onchange = (e) => send({ type: 'set', key: k, value: +e.target.value });
 $('scale').onchange = (e) => send({ type: 'set', key: 'scale', value: e.target.value });
 $('hints').onchange = (e) => send({ type: 'set', key: 'hints', value: e.target.checked });
+$('journey').onchange = (e) => send({ type: 'set', key: 'journey', value: e.target.checked });
+$('next').onclick = () => send({ type: 'cmd', name: 'next' });
 $('new').onclick = () => send({ type: 'cmd', name: 'new' });
 $('end').onclick = () => send({ type: 'cmd', name: 'end' });
 addEventListener('keydown', (e) => {
@@ -155,6 +159,7 @@ addEventListener('keydown', (e) => {
   const n = e.code.startsWith('Digit') ? +e.code.slice(5) : 0;
   if (n >= 1 && n <= hello.presets.length) send({ type: 'preset', preset: hello.presets[n - 1].id });
   else if (e.key === 'Enter') send({ type: 'cmd', name: 'end' });
+  else if (e.key === ' ') { e.preventDefault(); send({ type: 'cmd', name: 'next' }); }
   else if (e.key.toLowerCase() === 'n') send({ type: 'cmd', name: 'new' });
 });
 send({ type: 'hello' });

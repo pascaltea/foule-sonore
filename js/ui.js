@@ -4,6 +4,7 @@ import { GW, GH, GN, MAX_SECTORS, SECTOR_COLORS, ZONES, LAYOUTS, makeLayout, san
 import { SCALES, KEYS, INSTRUMENTS, PRESETS } from './music.js';
 import { endSession, newSession } from './metrics.js';
 import { setNet, netInfo, regieUrl } from './remote.js';
+import { gallery, nextStop, exportGallery, clearGallery } from './journey.js';
 import { PALETTES } from './visuals.js';
 import * as capture from './capture.js';
 import { slots, BONES, status as poseStatus, reset as resetPose } from './pose.js';
@@ -13,10 +14,10 @@ let handlers = {}, noteTimer = 0;
 const HL = 360, hE = new Float32Array(HL), hS = new Float32Array(HL), hC = new Float32Array(HL), hG = new Float32Array(HL);
 let hp = 0;
 const CELL = 6, OX = 8, OY = 8;        // géométrie de la grille dans le canvas debug
-let sel = -1, drag = null, cfgShown = 0, hintIdx = 0, hintCycle = -1;
+let sel = -1, drag = null, cfgShown = 0, hintIdx = 0, hintCycle = -1, galleryShown = -1, endShown = null, clearArmed = 0;
 const modeKey = () => (settings.mode === 'crowd' ? 'crowd' : settings.zones ? 'trio' : 'group');
 const INVITE = {
-  trio: ['Réveillons la Créature', 'Elle attend trois d\'entre vous'],
+  trio: ['Imaginons la Créature', 'Elle attend trois d\'entre vous'],
   group: ['Réveillons la Créature', 'Approchez, elle vous écoute'],
   crowd: ['Réveillons la Créature', 'Imaginons-la ensemble'],
 };
@@ -54,6 +55,7 @@ function sync() {
   document.querySelectorAll('[data-mode]').forEach((b) => b.classList.toggle('active', b.dataset.mode === mk));
   $('invite').firstElementChild.textContent = INVITE[mk][0]; $('invite').lastElementChild.textContent = INVITE[mk][1];
   $('preset').value = settings.preset; $('sessionMin').value = settings.sessionMin; $('hintsOn').checked = settings.hints;
+  $('journeyOn').checked = settings.journey; document.body.classList.toggle('journey', settings.journey);
   document.querySelectorAll('[data-preset]').forEach((b) => b.classList.toggle('active', b.dataset.preset === settings.preset && !settings.custom));
   $('cfg').textContent = (PRESETS[settings.preset]?.name || '') + (settings.custom ? ' · libre' : '');
   $('creatureOn').checked = settings.creature; $('gauge').style.display = settings.creature ? 'none' : '';
@@ -166,7 +168,7 @@ function deleteSelected() {
 }
 
 // ---------- Export / import de la configuration ----------
-const CFG_KEYS = ['sensitivity', 'scale', 'key', 'volume', 'palette', 'dramaSpeed', 'showSectors', 'zones', 'creature', 'preset', 'custom', 'sessionMin', 'hints'];
+const CFG_KEYS = ['journey', 'sensitivity', 'scale', 'key', 'volume', 'palette', 'dramaSpeed', 'showSectors', 'zones', 'creature', 'preset', 'custom', 'sessionMin', 'hints'];
 function exportConfig() {
   const cfg = { type: 'foule-sonore', version: 4, sectors: configOf('crowd'), players: playersConfig() };
   CFG_KEYS.forEach((k) => { cfg[k] = settings[k]; });
@@ -193,6 +195,7 @@ export function applyConfig(cfg) {
   if ('custom' in cfg) settings.custom = !!cfg.custom;
   if (cfg.sessionMin >= 0) settings.sessionMin = clamp(+cfg.sessionMin, 0, 30);
   if ('hints' in cfg) settings.hints = !!cfg.hints;
+  if ('journey' in cfg) settings.journey = !!cfg.journey;
   resetPose();
   sel = -1;
   $('scale').value = settings.scale; $('key').value = settings.key; $('palette').value = settings.palette;
@@ -250,7 +253,8 @@ export function remoteState() {
     places: settings.sectors.slice(0, n).map((s, i) => ({ name: s.name, inst: s.inst, vol: s.vol, mute: s.mute, present: s.present !== false, on: state.sec[i].on, energy: +state.sec[i].energy.toFixed(2) })),
     gauge: +d.gauge.toFixed(3), phase: d.phase, attract: d.attract, hush: d.hush, lift: +d.lift.toFixed(2), bpm: Math.round(state.music.bpm),
     session: { on: ss.on, t: Math.floor(ss.t), ended: ss.ended > 0 },
-    set: { volume: settings.volume, sensitivity: settings.sensitivity, dramaSpeed: settings.dramaSpeed, sessionMin: settings.sessionMin, scale: settings.scale, key: settings.key, hints: settings.hints, simulate: settings.simulate },
+    stops: state.journey.bands.map((b) => PRESETS[b.id]?.name).filter(Boolean), creatures: gallery.n,
+    set: { journey: settings.journey, volume: settings.volume, sensitivity: settings.sensitivity, dramaSpeed: settings.dramaSpeed, sessionMin: settings.sessionMin, scale: settings.scale, key: settings.key, hints: settings.hints, simulate: settings.simulate },
   };
 }
 export function remoteApply(m) {
@@ -262,6 +266,8 @@ export function remoteApply(m) {
   else if (m.type === 'set' && REMOTE_SET[m.key]) { const [a, b] = REMOTE_SET[m.key]; settings[m.key] = m.key === 'key' ? Math.round(clamp(+m.value, a, b)) : clamp(+m.value, a, b); syncInputs(); sync(); }
   else if (m.type === 'set' && m.key === 'scale' && SCALES[m.value]) { settings.scale = m.value; syncInputs(); sync(); }
   else if (m.type === 'set' && m.key === 'hints') { settings.hints = !!m.value; sync(); }
+  else if (m.type === 'set' && m.key === 'journey') { settings.journey = !!m.value; sync(); }
+  else if (m.type === 'cmd' && m.name === 'next') nextStop();
   else if (m.type === 'cmd' && m.name === 'end') endSession();
   else if (m.type === 'cmd' && m.name === 'new') newSession();
 }
@@ -297,6 +303,13 @@ export function init(h) {
   $('sessionMin').onchange = (e) => { settings.sessionMin = +e.target.value; sync(); };
   $('hintsOn').onchange = (e) => { settings.hints = e.target.checked; sync(); };
   $('sessNew').onclick = newSession; $('sessEnd').onclick = endSession; $('openRegie').onclick = openRegie;
+  $('journeyOn').onchange = (e) => { settings.journey = e.target.checked; sync(); };
+  $('nextStop').onclick = nextStop;
+  $('galExport').onclick = async () => { if (!(await exportGallery())) note('La galerie est encore vide.', 3000); };
+  $('galClear').onclick = (e) => {            // deux clics pour vider : pas de fenêtre de confirmation
+    if (performance.now() - clearArmed < 3000) { clearGallery(); e.target.textContent = 'Vider la galerie'; clearArmed = 0; note('Galerie vidée.', 2500); }
+    else { clearArmed = performance.now(); e.target.textContent = 'Confirmer ?'; setTimeout(() => { e.target.textContent = 'Vider la galerie'; }, 3000); }
+  };
   $('netOn').onchange = (e) => toggleNet(e.target.checked);
   $('netNew').onclick = () => toggleNet(true, true);
   $('netCopy').onclick = () => { navigator.clipboard?.writeText(regieUrl()).then(() => note('Lien de la régie copié.', 2500), () => note(regieUrl(), 9000)); };
@@ -431,12 +444,12 @@ function hintList() {
   const ss = state.session, group = settings.mode === 'group', L = [];
   const n = group ? settings.sectors.filter((s) => s.present).length : 0;
   // Des invitations plutôt qu'un mode d'emploi : chacune appelle un geste sans le décrire.
-  if (settings.sessionMin && ss.on && settings.sessionMin * 60 - ss.t < 35) return ['C\'est maintenant : tout, ensemble'];
+  if (settings.sessionMin && ss.on && settings.sessionMin * 60 - ss.t < 35) return [settings.journey ? 'Retour à Genève : ramenez tout ce que vous avez trouvé' : 'C\'est maintenant : tout, ensemble'];
   if (!group) return ['Elle vous écoute', 'Et si vous ne faisiez plus qu\'un ?', 'Faites trembler l\'air'];
   if (ss.t < 40) L.push('Elle vous écoute', 'Allez chercher la note la plus haute', 'Faites-vous immense');
   else L.push('Faites trembler l\'air', 'Devenez tout petit', 'Ralentissez, jusqu\'à presque rien', 'Touchez le ciel', 'Un bond, pour voir');
   if (trio()) L.push('Et si vous changiez de place ?');
-  if (n >= 2) L.push('Portez le ciel à plusieurs', 'Retenez votre souffle, tous ensemble', 'Répondez-vous');
+  if (n >= 2) L.push(settings.journey ? 'Portez le ciel à plusieurs, il vous emmène ailleurs' : 'Portez le ciel à plusieurs', 'Retenez votre souffle, tous ensemble', 'Répondez-vous');
   if (trio() && n > 0 && n < ZONES) L.push('Il manque quelqu\'un pour l\'éveiller');
   return L;
 }
@@ -455,6 +468,20 @@ function updateHints(now) {
   if (on && el.textContent !== txt) el.textContent = txt;
   el.classList.toggle('on', on);
   $('end').classList.toggle('on', ss.ended > 0);
+  // Fin de session : la créature du trio reçoit son numéro. À l'attente : toutes celles de la soirée.
+  const last = state.journey.last;
+  if (ss.ended > 0 && last && endShown !== last) {
+    endShown = last;
+    $('end').innerHTML = `<b>Créature n° ${last.n}</b><small>née à ${last.at} ${esc(last.who)}</small><small>${last.stops.map(esc).join(' · ')}</small>`;
+  }
+  if (galleryShown !== gallery.version) {
+    galleryShown = gallery.version;
+    const items = gallery.items.slice(-24);
+    $('gallery').innerHTML = items.map((it) => `<figure><img src="${it.img}" alt=""><figcaption>n° ${it.n}</figcaption></figure>`).join('');
+    $('galCount').textContent = gallery.items.length ? `${gallery.items.length} créature${gallery.items.length > 1 ? 's' : ''} ce soir` : 'Galerie vide';
+  }
+  const wall = state.music.running && d.attract && ss.ended === 0 && gallery.items.length > 0;
+  $('gallery').classList.toggle('on', wall); document.body.classList.toggle('wall', wall);
   const dur = settings.sessionMin * 60;
   $('clock').style.width = (ss.on && dur && ss.ended === 0 ? clamp(ss.t / dur) * 100 : 0) + '%';
   $('cfg').classList.toggle('on', state.music.running && !d.attract);

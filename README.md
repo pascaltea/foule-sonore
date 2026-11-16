@@ -18,11 +18,23 @@ Dans les deux premiers modes, bouger joue, lever les mains monte dans l'aigu, de
 
 Le mode se choisit sur l'écran de démarrage ou dans la régie. Noms, couleurs et instruments des places se changent dans la régie.
 
-## Six voyages
+## Le voyage : Genève, aller-retour
 
-Une configuration (un « voyage ») règle d'un coup les trois instruments, la gamme, la tonalité et la plage de tempo. Les trios sont pensés pour sonner ensemble dès la première note : rythme à gauche, harmonie au centre, chant à droite. Tous les sons sont synthétisés.
+Par défaut, chaque session est un voyage.
 
-| Voyage | Gauche | Centre | Droite | Gamme |
+- **Départ de Genève.** Le dôme est nu.
+- **Les escales.** Quand le trio lève les mains ensemble et tient deux secondes, il change de pays : nouveaux instruments, nouvelle gamme, nouvelle couleur. Sans ce geste, l'escale change seule au bout de 75 secondes. L'ordre des escales tourne d'une session à l'autre.
+- **Les strates.** Chaque escale dépose une strate sur le dôme, à sa couleur. Sa forme dépend de la façon dont on y a joué : épaisse si l'on y reste et qu'on joue fort, ondulée si l'on ouvre les bras, serrée si les gestes sont vifs.
+- **Le retour.** La dernière demi-minute ramène tout le monde à Genève.
+- **La créature.** Au final, le dôme se fige : c'est la créature de ce trio, numérotée, avec son heure de naissance et ses escales. Elle rejoint la galerie affichée sur l'écran d'attente entre deux sessions.
+
+La galerie est gardée dans le navigateur de l'ordinateur de scène (48 créatures au plus). « Exporter la galerie », dans les réglages, la télécharge en une seule image. Le voyage se désactive dans les réglages ou la régie ; on choisit alors l'escale à la main.
+
+## Six escales
+
+Une escale règle d'un coup les trois instruments, la gamme, la tonalité et la plage de tempo. Les trios sont pensés pour sonner ensemble dès la première note : rythme à gauche, harmonie au centre, chant à droite. Tous les sons sont synthétisés.
+
+| Escale | Gauche | Centre | Droite | Gamme |
 |---|---|---|---|---|
 | Genève | Batterie | Piano | Violon | Pentatonique mineure |
 | Mali | Djembé | Balafon | Kora | Pentatonique majeure |

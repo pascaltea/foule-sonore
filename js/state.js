@@ -41,7 +41,7 @@ export function sanitizeSectors(arr) {
   });
 }
 
-const KEY = 'foule-sonore-acg4';
+const KEY = 'foule-sonore-acg5';
 let saved = {};
 try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { /* stockage indisponible */ }
 
@@ -69,6 +69,7 @@ export const settings = Object.assign({
   custom: false,      // un instrument a été changé à la main depuis le choix de la configuration
   sessionMin: 5,      // durée d'une session en minutes ; 0 = libre
   hints: true,        // consignes de jeu affichées au public
+  journey: true,      // voyage aller-retour depuis Genève : les gestes collectifs font changer d'escale
   remoteOn: false,    // régie sur téléphone, par Internet
   room: '',           // code secret du canal de régie
   cameraId: '',
@@ -122,6 +123,9 @@ export const state = {
   drama: { gauge: 0, tier: 0, phase: 'build', phaseT: 0, attract: true, tierUps: 0, act: 0,
     lift: 0, liftStarts: 0, liftCd: 0, drops: 0, hush: false, hushT: 0, hushEnds: 0, loudAge: 99, quietT: 0 },
   session: { on: false, t: 0, ended: 0, ends: 0, idle: 0 },
+  ink: [0.03, 0.6, 0.36],
+  // Voyage : les escales de la session en cours, chacune devenue une strate du dôme (la plus récente en dernier).
+  journey: { bands: [], cur: '', t: 0, route: [], idx: 0, maxN: 0, wasOn: false, drops: 0, ends: 0, last: null },
   music: {
     running: false, bpm: 90, beatPulse: 0, beatCount: 0, accent: 0, accentCount: 0, accentX: 0.5, accentY: 0.5,
     chord: 0, level: 0,
@@ -140,12 +144,9 @@ export function rebuildSectorMap() {
   for (let c = 0; c < GN; c++) if (map[c] >= 0) state.secArea[map[c]]++;
 }
 
-// Les trois affiches deviennent trois temps de lumière : la nuit verte de la cour, le bleu du lac, l'orange du matin.
-// Chaque temps a son encre et, comme sur l'affiche, une seule couleur d'accent (jaune, magenta, vert).
-const ACT_INK = [[0.03, 0.6, 0.36], [0.04, 0.5, 0.86], [1, 0.46, 0.04]];
-const ACT_ACCENT = [[1, 1, 0.33], [1, 0.4, 1], [0.04, 0.9, 0]];
-const mix3 = (T, a) => { const i = Math.min(1, Math.floor(a)), f = clamp(a - i); return T[i].map((v, k) => v + (T[i + 1][k] - v) * f); };
-export function actColors() { const a = clamp(state.drama.act, 0, 2); return { ink: mix3(ACT_INK, a), accent: mix3(ACT_ACCENT, a) }; }
+// Couleur de la scène : l'encre de l'escale en cours (state.ink, qui glisse d'une escale à l'autre, voir journey.js).
+// Une seule couleur à la fois ; les joueurs y ajoutent une teinte plus claire de la même encre.
+export function actColors() { const ink = state.ink; return { ink, accent: ink.map((v) => 0.5 + 0.5 * v) }; }
 
 export function clamp(v, a = 0, b = 1) { return v < a ? a : v > b ? b : v; }
 // Lissage exponentiel avec temps de montée et de descente distincts.

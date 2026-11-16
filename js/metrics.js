@@ -138,7 +138,7 @@ function updateTogether(dt) {
     d.lift = Math.min(1, d.lift + dt / 2.2);
     if (before < 0.2 && d.lift >= 0.2) d.liftStarts++;          // la montée ne part que si le geste est tenu, pas sur un simple passage
     if (d.lift >= 1) { d.drops++; d.lift = 0; d.liftCd = 9; d.gauge = clamp(d.gauge + 0.12); }
-  } else if (d.lift > 0) { d.lift = Math.max(0, d.lift - dt * 1.5); if (d.lift === 0 && d.liftCd <= 0) d.liftCd = 2.5; }
+  } else if (d.lift > 0) d.lift = Math.max(0, d.lift - dt * 1.5);
 
   d.loudAge = n >= 2 && m.playing >= 2 && maxE > 0.3 ? 0 : d.loudAge + dt;
   d.quietT = n >= 2 && maxE < 0.07 ? d.quietT + dt : 0;
@@ -163,9 +163,9 @@ function updateSession(dt) {
   ss.t += dt;
   ss.idle = d.attract ? ss.idle + dt : 0;
   if (ss.idle > 10) { ss.on = false; ss.t = 0; d.gauge = 0; return; }            // la scène s'est vidée
-  if (dur && ss.t >= dur) { ss.ended = 10; ss.ends++; }
+  if (dur && ss.t >= dur) { ss.ended = 14; ss.ends++; }
 }
-export function endSession() { const ss = state.session; if (ss.ended === 0) { ss.on = true; ss.ended = 10; ss.ends++; } }
+export function endSession() { const ss = state.session; if (ss.ended === 0 && ss.on) { ss.ended = 14; ss.ends++; } }
 export function newSession() { const ss = state.session; ss.ended = 0; ss.on = false; ss.t = 0; state.drama.gauge = 0; state.drama.phase = 'build'; }
 
 export function updateDrama(dt) {

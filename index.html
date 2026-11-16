@@ -133,11 +133,19 @@
     font: 400 clamp(9px, .85vw, 15px)/1 var(--title); text-transform: uppercase; letter-spacing: .34em; color: #fff; }
   #cfg.on { opacity: .4; }
   #clock { position: fixed; left: 0; bottom: 0; height: 2px; width: 0; background: rgba(255,255,255,.45); pointer-events: none; }
-  #end { position: fixed; inset: 0 4vw 34vh; display: grid; place-content: center; gap: 1.6vh; text-align: center; pointer-events: none;
+  #end { position: fixed; inset: 0 4vw 58vh; display: grid; place-content: center; gap: 1.4vh; text-align: center; pointer-events: none;
     opacity: 0; transition: opacity 2s; font-family: var(--title); text-transform: uppercase; }
   #end.on { opacity: 1; }
-  #end b { font-weight: 400; font-size: clamp(22px, 4vw, 76px); letter-spacing: .3em; text-indent: .3em; color: #fff; }
+  /* Écran d'attente : les créatures de la soirée, en mosaïque derrière l'invitation. */
+  #gallery { position: fixed; inset: 40vh 6vw 13vh; display: none; flex-wrap: wrap; gap: 1vw; justify-content: center; align-content: center; pointer-events: none; opacity: .8; }
+  #gallery.on { display: flex; }
+  #gallery figure { margin: 0; position: relative; width: clamp(90px, 10.4vw, 230px); }
+  #gallery img { display: block; width: 100%; height: auto; mix-blend-mode: screen; }
+  #gallery figcaption { position: absolute; left: 0; right: 0; top: 4px; text-align: center; font: 400 clamp(7px, .62vw, 11px)/1 var(--title); letter-spacing: .24em; text-transform: uppercase; color: #fff; opacity: .7; }
+  body.wall #invite { inset: 0 4vw 58vh; }
+  #end b { font-weight: 400; font-size: clamp(20px, 3.4vw, 64px); letter-spacing: .26em; text-indent: .26em; color: #fff; }
   #end small { font-size: clamp(10px, .95vw, 18px); letter-spacing: .34em; text-indent: .34em; color: #fff; opacity: .8; }
+  body.journey .jOff, body:not(.journey) .jOn { display: none; }
   body.group .crowdOnly { display: none !important; }
   body:not(.group) .groupOnly, body.trio .groupOnly { display: none !important; }
   body:not(.trio) .trioOnly { display: none !important; }
@@ -164,8 +172,13 @@
     <p class="hint">Scannez ce code avec le téléphone. Qui a ce code pilote la scène : ne le projetez pas.</p>
     <div class="row"><button id="netCopy">Copier le lien</button><button id="netNew" title="Coupe l'accès de tous les téléphones déjà reliés">Nouveau code</button></div>
   </div>
-  <label>Configuration</label>
+  <label class="check"><input id="journeyOn" type="checkbox"> Voyage : départ et retour à Genève</label>
+  <p class="hint">Mains levées ensemble : escale suivante (ou seule après 75 s). Chaque escale laisse une strate sur le dôme ; au final il devient une créature, gardée dans la galerie.</p>
+  <label>Escale</label>
   <select id="preset"></select>
+  <div class="row"><button id="nextStop">Escale suivante</button></div>
+  <div class="row"><button id="galExport" title="Toutes les créatures de la soirée en une image">Exporter la galerie</button><button id="galClear">Vider la galerie</button></div>
+  <p class="hint" id="galCount"></p>
   <div class="row">
     <div style="flex:1"><label style="margin-top:0">Durée d'une session</label><select id="sessionMin"><option value="0">Libre</option><option value="3">3 minutes</option><option value="5">5 minutes</option><option value="8">8 minutes</option><option value="10">10 minutes</option></select></div>
   </div>
@@ -227,13 +240,14 @@
 <div id="hint"></div>
 <div id="cfg"></div>
 <div id="clock"></div>
+<div id="gallery"></div>
 <div id="end"><b>Merci</b><small>Place aux suivants</small></div>
 
 <div id="start">
   <p class="eyebrow">Assemblée créative de Genève · Downtown Studio · 19 novembre 2026</p>
   <h1>Foule Sonore</h1>
   <p class="tag">Imaginons la Créature ensemble</p>
-  <h4>Choisir un voyage</h4>
+  <h4><span class="jOn">Le voyage part de Genève et y revient · les escales</span><span class="jOff">Choisir une escale</span></h4>
   <div id="presetPick"></div>
   <h4>Comment jouer</h4>
   <ul id="how">
@@ -242,7 +256,7 @@
     <li><b>Ouvrir les bras</b>Le son s'éclaircit et résonne. Bras serrés, il se feutre.</li>
     <li class="trioOnly"><b>Changer de place</b>Gauche, centre, droite : trois instruments. On passe de l'un à l'autre.</li>
     <li class="groupOnly"><b>Sauter</b>Un saut donne un accent.</li>
-    <li><b>Ensemble</b>Tous les mains en l'air, ou tous immobiles d'un coup : la musique répond.</li>
+    <li><b>Ensemble</b>Tous les mains en l'air : on change de pays. Tous immobiles d'un coup : silence.</li>
   </ul>
   <div id="go"><button id="btnStart">Démarrer avec la caméra</button><button id="btnSim">Essayer sans caméra</button></div>
   <div id="modes"><button data-mode="trio">Scène à trois</button><button data-mode="group">Petit groupe</button><button data-mode="crowd">Foule</button></div>
