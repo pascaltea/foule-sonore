@@ -48,7 +48,7 @@ export async function init() {
 function build() {
   // Sortie : volume général -> limiteur -> haut-parleurs.
   limiter = ac.createDynamicsCompressor();
-  limiter.threshold.value = -10; limiter.knee.value = 2; limiter.ratio.value = 20;
+  limiter.threshold.value = -7; limiter.knee.value = 2; limiter.ratio.value = 20;
   limiter.attack.value = 0.002; limiter.release.value = 0.25;
   analyser = ac.createAnalyser(); analyser.fftSize = 1024;
   master = gain(0, limiter);
@@ -242,7 +242,7 @@ const stepsLen = (x) => (x.climax ? 2 : x.lvl === 0 ? 4 : x.lvl === 1 ? 2 : 1) *
 
 const INST = {
   drums: {
-    label: 'Batterie', level: 0.6, rev: 0.1, dly: 0,
+    label: 'Batterie', level: 0.95, rev: 0.1, dly: 0, perc: true,
     play(x) {
       const { t, s16, lvl, e, d, climax, coh } = x, v = 0.6 + 0.4 * e;
       let p = false;
@@ -322,7 +322,7 @@ const INST = {
     accent(x) { [x.r, x.r + 2, x.r + 4].forEach((dg, i) => bellNote(x.t + i * 0.03, note(x, dg, 36), 0.26, x.d, 1)); },
   },
   congas: {
-    label: 'Congas', level: 0.8, rev: 0.12, dly: 0,
+    label: 'Congas', level: 1.25, rev: 0.12, dly: 0, perc: true,
     play(x) {
       const { t, s16, e, d } = x, hi = note(x, x.r + 2, 12), lo = note(x, x.r, 12);
       if (x.climax) { if (x.uni < 0) return false; drum(t, x.uni % 2 ? hi : lo, 0.5, d, 0.1); return true; }
@@ -443,21 +443,21 @@ function mel(label, level, rev, dly, oct, one, extra = {}) {
 }
 
 Object.assign(INST, {
-  djembe: perc('Djembé', 0.8, { 0: 'B...T...B.t.T...', 1: 'B.tSB.T.B.tSt.T.', 2: 'B.tSBtTsB.tSTtTs', u: 'BS', g: 'T' }, {
+  djembe: perc('Djembé', 1.25, { 0: 'B...T...B.t.T...', 1: 'B.tSB.T.B.tSt.T.', 2: 'B.tSBtTsB.tSTtTs', u: 'BS', g: 'T' }, {
     B: (x, v) => { voice({ f: 72, fFrom: 130, glide: 0.05, t: x.t, dur: 0.02, vol: 0.9 * v, dest: x.d, a: 0.002, r: 0.13 }); },
     T: (x, v) => drum(x.t, 235, 0.55 * v, x.d, 0.07),
     S: (x, v) => { tap(x.t, 0.6 * v, x.d, 2600, 0.9, 0.02); voice({ f: 430, t: x.t, dur: 0.004, vol: 0.25 * v, dest: x.d, r: 0.02 }); },
   }),
-  tabla: perc('Tabla', 0.85, { 0: 'D...N...D...N.t.', 1: 'D.t.N.t.G.N.N.tt', 2: 'D.tNt.NtG.tNtNtt', u: 'DN', g: 'T' }, (() => {
+  tabla: perc('Tabla', 1.25, { 0: 'D...N...D...N.t.', 1: 'D.t.N.t.G.N.N.tt', 2: 'D.tNt.NtG.tNtNtt', u: 'DN', g: 'T' }, (() => {
     const G = (x, v) => voice({ f: 84, fFrom: 58, glide: 0.11, t: x.t, dur: 0.05, vol: 0.85 * v, dest: x.d, a: 0.003, r: 0.13 });
     const N = (x, v) => { const f = mtof(x.base + 36); voice({ f, t: x.t, dur: 0.006, vol: 0.4 * v, dest: x.d, a: 0.001, r: 0.15 }); voice({ f: f * 2.01, t: x.t, dur: 0.004, vol: 0.14 * v, dest: x.d, a: 0.001, r: 0.08 }); tap(x.t, 0.2 * v, x.d, 4000, 2, 0.006); };
     return { G, N, T: (x, v) => tap(x.t, 0.4 * v, x.d, 1900, 2.5, 0.009), D: (x, v) => { G(x, v); N(x, v); } };
   })()),
-  taiko: perc('Taïko', 0.6, { 0: 'D.......D...k...', 1: 'D...k.k.D.d.k...', 2: 'D.k.D.kkD.d.DkDk', u: 'DK', g: 'K' }, {
+  taiko: perc('Taïko', 0.7, { 0: 'D.......D...k...', 1: 'D...k.k.D.d.k...', 2: 'D.k.D.kkD.d.DkDk', u: 'DK', g: 'K' }, {
     D: (x, v) => { voice({ f: 52, fFrom: 115, glide: 0.08, t: x.t, dur: 0.03, vol: v, dest: x.d, a: 0.002, r: 0.3 }); noise({ t: x.t, vol: 0.3 * v, dest: x.d, type: 'lowpass', f: 900, r: 0.03 }); },
     K: (x, v) => { tap(x.t, 0.5 * v, x.d, 2300, 3, 0.01); voice({ f: 880, t: x.t, dur: 0.003, vol: 0.2 * v, dest: x.d, r: 0.015 }); },
   }),
-  darbuka: perc('Darbouka', 1, { 0: 'D.T...T.D...T...', 1: 'D.T.k.T.D.k.T.k.', 2: 'D.TkkkT.DkkkT.Tk', u: 'DT', g: 'K' }, {
+  darbuka: perc('Darbouka', 1.8, { 0: 'D.T...T.D...T...', 1: 'D.T.k.T.D.k.T.k.', 2: 'D.TkkkT.DkkkT.Tk', u: 'DT', g: 'K' }, {
     D: (x, v) => drum(x.t, 96, 0.9 * v, x.d, 0.11),
     T: (x, v) => { tap(x.t, 0.6 * v, x.d, 3800, 1.5, 0.018); voice({ f: 640, t: x.t, dur: 0.004, vol: 0.22 * v, dest: x.d, r: 0.02 }); },
     K: (x, v) => tap(x.t, 0.38 * v, x.d, 4600, 2, 0.01),
@@ -607,7 +607,7 @@ export function update(dt) {
     c.level.gain.setTargetAtTime(c.on ? def.level * s.vol * (0.4 + 0.6 * amt) : 0, now, 0.25);
     c.pan.pan.setTargetAtTime(clamp(((s.x + s.w / 2) / GW - 0.5) * 1.7, -0.9, 0.9), now, 0.1);
     const op = q.open;       // bras ouverts : timbre plus clair, plus d'écho et d'espace
-    c.filt.frequency.setTargetAtTime((def.perc ? 1400 : 650) * 2 ** (op * (def.perc ? 3.6 : 4.6)), now, 0.12);
+    c.filt.frequency.setTargetAtTime((def.perc ? 4200 : 1000) * 2 ** (op * (def.perc ? 2 : 4)), now, 0.12);      // les percussions gardent toujours leur attaque
     c.rv.gain.setTargetAtTime(def.rev * (0.6 + 0.9 * op), now, 0.2); c.dl.gain.setTargetAtTime(def.dly * (0.4 + 1.4 * op) + 0.22 * Math.max(0, op - 0.6), now, 0.2);
     if (q.peakCount !== lastPeak[i]) { lastPeak[i] = q.peakCount; if (c.on) c.accent = true; }
   }

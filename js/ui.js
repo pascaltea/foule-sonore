@@ -16,9 +16,9 @@ const CELL = 6, OX = 8, OY = 8;        // géométrie de la grille dans le canva
 let sel = -1, drag = null, cfgShown = 0, hintIdx = 0, hintCycle = -1;
 const modeKey = () => (settings.mode === 'crowd' ? 'crowd' : settings.zones ? 'trio' : 'group');
 const INVITE = {
-  trio: ['Réveillons la Créature', 'Trois places, trois instruments'],
-  group: ['Réveillons la Créature', 'Bougez, elle vous regarde'],
-  crowd: ['Bougez !', 'Imaginons la Créature ensemble'],
+  trio: ['Réveillons la Créature', 'Elle attend trois d\'entre vous'],
+  group: ['Réveillons la Créature', 'Approchez, elle vous écoute'],
+  crowd: ['Réveillons la Créature', 'Imaginons-la ensemble'],
 };
 
 export function note(text, ms = 5000) {
@@ -430,13 +430,14 @@ function drawDebug() {
 function hintList() {
   const ss = state.session, group = settings.mode === 'group', L = [];
   const n = group ? settings.sectors.filter((s) => s.present).length : 0;
-  if (settings.sessionMin && ss.on && settings.sessionMin * 60 - ss.t < 35) return ['Dernières secondes : tous ensemble'];
-  if (!group) return ['Bougez ensemble', 'Plus vous bougez ensemble, plus ça monte'];
-  if (ss.t < 45) L.push('Bougez pour jouer', 'Mains hautes : aigu · mains basses : grave', 'Ouvrez les bras : le son s\'ouvre');
-  else L.push('Gestes rapides : le rythme se resserre', 'Ouvrez les bras : le son s\'ouvre', 'Un saut : un accent');
-  if (trio()) L.push('Changez de place : changez d\'instrument');
-  if (n >= 2) L.push('Levez tous les mains en même temps, et tenez', 'Figez-vous tous ensemble, puis repartez');
-  if (trio() && n > 0 && n < ZONES) L.push('Il reste une place : à trois, tout s\'éveille');
+  // Des invitations plutôt qu'un mode d'emploi : chacune appelle un geste sans le décrire.
+  if (settings.sessionMin && ss.on && settings.sessionMin * 60 - ss.t < 35) return ['C\'est maintenant : tout, ensemble'];
+  if (!group) return ['Elle vous écoute', 'Et si vous ne faisiez plus qu\'un ?', 'Faites trembler l\'air'];
+  if (ss.t < 40) L.push('Elle vous écoute', 'Allez chercher la note la plus haute', 'Faites-vous immense');
+  else L.push('Faites trembler l\'air', 'Devenez tout petit', 'Ralentissez, jusqu\'à presque rien', 'Touchez le ciel', 'Un bond, pour voir');
+  if (trio()) L.push('Et si vous changiez de place ?');
+  if (n >= 2) L.push('Portez le ciel à plusieurs', 'Retenez votre souffle, tous ensemble', 'Répondez-vous');
+  if (trio() && n > 0 && n < ZONES) L.push('Il manque quelqu\'un pour l\'éveiller');
   return L;
 }
 function updateHints(now) {
@@ -444,7 +445,7 @@ function updateHints(now) {
   let txt = '', on = false;
   if (ss.ended > 0 || !state.music.running) { /* rien */ }
   else if (now - cfgShown < 6000 && cfgShown) { txt = presetLine(); on = true; }
-  else if (d.lift > 0.2) { txt = 'Tenez…'; on = true; }
+  else if (d.lift > 0.2) { txt = 'Encore…'; on = true; }
   else if (settings.hints && !d.attract && !d.hush) {
     const cyc = Math.floor(now / 11000);
     if (cyc !== hintCycle) { hintCycle = cyc; hintIdx++; }
