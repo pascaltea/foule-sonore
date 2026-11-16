@@ -3,7 +3,7 @@
 // prend peu à peu la forme de la façon de jouer du trio. À la fin elle se fige, entourée de son aura ; portrait()
 // en tire l'image fixe de la galerie. Le dessin lui-même est dans creature-draw.js.
 import { state, settings, actColors, clamp, smooth } from './state.js';
-import { PLAIN, canvas, paintSkin, drawCreature, Gaze } from './creature-draw.js';
+import { PLAIN, canvas, paintSkin, drawCreature, Gaze, auraTint } from './creature-draw.js';
 
 let cv, g, W = 0, H = 0;
 let rise = 0, glow = 0, eyes = 0, aura = 0, blinkIn = 4, blink = 0, hop = 0, lastAccent = 0;
@@ -62,6 +62,6 @@ export function render(dt, t) {
   const up = R * cur.sy * (0.1 + 0.82 * rise + (sleeping ? 0.012 * Math.sin(t * 0.9) : 0) + 0.02 * beat * rise + 0.03 * hop + (ended ? 0.012 * Math.sin(t * 0.9) : 0));
   paintSkin(bandsNow(), cur, ended ? 0 : t);
   drawCreature(g, W, H, W / 2, H + R * cur.sy - up, R,
-    { ink, glow: clamp(glow), beat, eyes: up > R * 0.3 ? eyes * (1 - (ended ? gaze.blink : blink)) : 0, flood: ended ? 0 : state.flood, t, aura: colorsNow(), auraStrength: aura,
+    { ink, glow: clamp(glow), beat, eyes: up > R * 0.3 ? eyes * (1 - (ended ? gaze.blink : blink)) : 0, flood: ended ? 0 : state.flood, t, aura: colorsNow(), auraStrength: aura, auraMain: ended ? auraTint(state.journey.bands) : null,
       life, wide: gaze.wide * life, look: gaze.look * life }, cur);
 }

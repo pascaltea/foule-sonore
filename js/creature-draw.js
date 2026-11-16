@@ -92,6 +92,13 @@ export function outline(c, cx, cy, R, o) {
 
 // Aura : des nappes de couleur (celles des pays traversés, et le vert de Genève) qui tournent lentement derrière
 // la créature. Elle ne s'arrête jamais et ne repasse jamais exactement au même endroit.
+// La couleur de l'aura : celle du pays où le trio a joué le plus fort, avec un fond de vert de Genève.
+// Si rien ne l'emporte sur Genève, elle reste verte.
+export function auraTint(bands) {
+  let best = null;
+  for (const b of bands || []) if (b.id && b.id !== 'geneve' && (!best || b.w > best.w)) best = b;
+  return best ? best.color.map((v, i) => 0.8 * v + 0.2 * GREEN[i]) : GREEN;
+}
 // Le souffle de l'aura, partagé par la scène et par les pages publiques : elle bat régulièrement si le trio a tenu
 // ensemble, et elle retient son souffle autant de fois qu'il a su se taire.
 export function auraBreath(f, t) {
@@ -104,9 +111,9 @@ export function auraBreath(f, t) {
 // (ils se sont fait de la place) ou file haut en mèches séparées (chacun sa voix) ; elle s'ouvre large (ils sont allés
 // vers l'autre) ; elle retient son souffle (leurs silences), une onde de grain part d'elle pour chaque débordement,
 // des étincelles bondissent (leurs sauts).
-export function drawAura(c, w, ground, cx, cy, R, colors, t, strength = 1, f = PLAIN, grains = 1500) {
+export function drawAura(c, w, ground, cx, cy, R, colors, t, strength = 1, f = PLAIN, grains = 1500, main = GREEN) {
   c.save(); c.globalCompositeOperation = 'lighter';
-  const MINT = [0.62, 0.95, 0.8], cols = [...colors.map((k) => k.map((v, i) => 0.25 * v + 0.75 * GREEN[i])), GREEN], n = cols.length, tt = t * f.aSpeed, wrap = f.aWrap, stray = 1 - f.aPulse, breath = auraBreath(f, t), k0 = strength * (0.75 + 0.25 * breath);
+  const MINT = main.map((v) => 0.5 * v + 0.5), cols = [...colors.map((k) => k.map((v, i) => 0.25 * v + 0.75 * main[i])), main], n = cols.length, tt = t * f.aSpeed, wrap = f.aWrap, stray = 1 - f.aPulse, breath = auraBreath(f, t), k0 = strength * (0.75 + 0.25 * breath);
   // Le halo, doux et rond, qui tourne lentement autour d'elle.
   for (let k = 0; k < n; k++) {
     const a = tt * (0.11 + 0.023 * k) * (k % 2 ? -1 : 1) + k * 2.4, d = R * (0.35 + 0.3 * Math.sin(tt * 0.17 + k * 1.3)) * (1.25 - 0.45 * wrap);
@@ -120,12 +127,26 @@ export function drawAura(c, w, ground, cx, cy, R, colors, t, strength = 1, f = P
     const rx = R * (0.55 + 0.75 * wrap + 0.3 * f.aReach), ry = R * (1.55 - 0.55 * wrap), x = cx + R * 0.12 * stray * Math.sin(tt * 0.21), y = cy - R * f.sy - ry * 0.45;
     c.save(); c.translate(x, y); c.scale(rx, ry);
     const gd = c.createRadialGradient(0, 0, 0, 0, 0, 1);
-    gd.addColorStop(0, css(MINT, 0.2 * strength * (0.6 + 0.4 * breath))); gd.addColorStop(0.45, css(GREEN, 0.07 * k0)); gd.addColorStop(1, css(GREEN, 0));
+    gd.addColorStop(0, css(MINT, 0.2 * strength * (0.6 + 0.4 * breath))); gd.addColorStop(0.45, css(main, 0.07 * k0)); gd.addColorStop(1, css(main, 0));
     c.fillStyle = gd; c.fillRect(-1, -1, 2, 2); c.restore();
   }
   // La brume de grain : des mèches fines qui montent de son dos.
   let sd = 29;
   const rnd = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; };
+  // Le cœur du nuage, en grain : dense et clair au-dessus d'elle, qui tourne lentement sur lui-même.
+  {
+    const rx = R * (0.5 + 0.7 * wrap + 0.3 * f.aReach), ry = R * (1.3 - 0.45 * wrap), x0 = cx + R * 0.12 * stray * Math.sin(tt * 0.21), y0 = cy - R * f.sy - ry * 0.42, ps = Math.max(1, R / 260);
+    const m = Math.round(grains * 1.3), ga = 0.42 * strength * (0.6 + 0.4 * breath);
+    for (let i = 0; i < m; i++) {
+      const r2 = 0.12 + 0.88 * rnd() ** 0.62, an = rnd() * 6.2832 + tt * (0.05 + 0.1 * rnd()) * (i % 2 ? 1 : -1), lum = rnd(), sz = rnd();
+      const puff = 1 + 0.18 * Math.sin(tt * 0.3 + an * 3 + i), x = x0 + rx * r2 * puff * Math.cos(an), y = y0 + ry * r2 * puff * Math.sin(an);
+      if (y > ground) continue;
+      const al = ga * (1 - Math.min(1, r2)) ** 1.2 * (0.3 + 0.7 * lum);
+      if (al < 0.02) continue;
+      const s = ps * (0.8 + 1.4 * sz);
+      c.fillStyle = css(main.map((v) => 0.45 * v + 0.55 * (0.6 + 0.4 * lum)), al); c.fillRect(x, y, s, s);
+    }
+  }
   const px = Math.max(1, R / 260), rise = R * (1.5 + 1.3 * (1 - 0.6 * wrap)), open = R * (0.15 + 1.1 * f.aReach), g = strength * breath;
   for (let i = 0; i < grains; i++) {
     const u = rnd(), sp = 0.035 + 0.05 * rnd(), ph = rnd(), jit = rnd(), bright = rnd(), tint = rnd(), sz = rnd();
@@ -139,7 +160,7 @@ export function drawAura(c, w, ground, cx, cy, R, colors, t, strength = 1, f = P
     const y = cy + R * f.sy * Math.sin(th) * (1 + 0.1 * jit) - rise * p * (0.5 + 0.5 * jit);
     if (y > ground) continue;
     const col = tint < 0.07 ? colors[i % Math.max(1, colors.length)] : null, s = px * (0.8 + 1.3 * sz);
-    c.fillStyle = col ? css([0.5 * col[0] + 0.3, 0.5 * col[1] + 0.4, 0.5 * col[2] + 0.35], al) : `rgba(${(80 + 130 * tint) | 0},230,${(160 + 60 * tint) | 0},${al})`;
+    c.fillStyle = col ? css([0.5 * col[0] + 0.3, 0.5 * col[1] + 0.4, 0.5 * col[2] + 0.35], al) : css(main.map((v) => v * (0.75 - 0.25 * tint) + 0.25 + 0.25 * tint), al);
     c.fillRect(x, y, s, s);
   }
   // Une onde de grain par débordement : Genève qui déborde encore.
@@ -211,7 +232,7 @@ export function drawCreature(c, w, ground, cx, cy, R, o, f) {
     halo.addColorStop(0, css(o.ink, 0.5 * o.glow * (0.85 + 0.15 * o.beat))); halo.addColorStop(0.45, css(o.ink, 0.14 * o.glow)); halo.addColorStop(1, css(o.ink, 0));
     c.fillStyle = halo; c.fillRect(0, 0, w, ground);
   }
-  if (o.aura) drawAura(c, w, ground, cx, cy, R, o.aura, o.t || 0, o.auraStrength ?? 1, f, o.grains ?? 0);
+  if (o.aura) drawAura(c, w, ground, cx, cy, R, o.aura, o.t || 0, o.auraStrength ?? 1, f, o.grains ?? 0, o.auraMain || GREEN);
   drawDust(c, ground, cx, cy, R, f, o.t || 0, o.glow, o.flood || 0);
   // Vivante : elle se balance à peine, le pied au sol, et respire.
   const life = o.life || 0, t = o.t || 0;
@@ -245,6 +266,7 @@ export class Gaze {
 export class Living {
   constructor(el, item, { dust = 900 } = {}) {
     this.el = el; this.item = item; this.dust = dust; this.phase = (item.n || 1) * 1.7; this.gaze = new Gaze(item.n || 1);
+    this.main = auraTint(item.bands);
     this.colors = item.bands.map((b) => b.color).filter((c, i, a) => a.findIndex((x) => x === c) === i).slice(-4);
   }
   build(w, h) {
@@ -261,7 +283,7 @@ export class Living {
     const c = el.getContext('2d'), tt = t + this.phase, f = this.f, R = this.R, cx = w / 2, cy = h + R * f.sy * 0.08;
     this.gaze.step(dt);
     c.clearRect(0, 0, w, h);
-    drawAura(c, w, h, cx, cy, R, this.colors, tt, 1.7, f, Math.round(this.dust * 5));
+    drawAura(c, w, h, cx, cy, R, this.colors, tt, 1.7, f, Math.round(this.dust * 5), this.main);
     drawDust(c, h, cx, cy, R, f, tt, 1, 0, this.dust);
     // L'aura se fond dans le noir de la page : aucun bord de cadre visible.
     c.save(); c.globalCompositeOperation = 'destination-in';

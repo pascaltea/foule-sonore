@@ -11,7 +11,7 @@ import { portrait } from './creature.js';
 import { slots } from './pose.js';
 import { splat } from './capture.js';
 import { GW, GH } from './state.js';
-import { PLAIN, auraBreath } from './creature-draw.js';
+import { PLAIN, auraBreath, auraTint } from './creature-draw.js';
 import { formOf, describe, whoOf, encode, decode } from './portrait.js';
 
 const GKEY = 'foule-sonore-galerie', TOUR = ['mali', 'levant', 'inde', 'japon', 'caraibes'], MAX_ITEMS = 48, STOPS = 3;
@@ -94,7 +94,8 @@ export function update(dt) {
   const ss = state.session, d = state.drama, m = state.m;
   // Couleur de la scène : celle du pays, noyée de vert quand Genève déborde.
   state.flood = Math.max(0, state.flood - dt / 4.5);
-  const target = ink(settings.preset), g = PRESETS.geneve.ink, f = state.flood ** 0.6;
+  // À la présentation, la brume prend la couleur de la créature : le pays où le trio a joué le plus fort.
+  const target = state.session.ended > 0 && J.done ? auraTint(J.bands) : ink(settings.preset), g = PRESETS.geneve.ink, f = state.flood ** 0.6;
   for (let k = 0; k < 3; k++) state.ink[k] = smooth(state.ink[k], target[k] + (g[k] - target[k]) * f, dt, state.flood > 0.02 ? 0.18 : 0.9);
 
   if (ss.on && !J.wasOn && ss.ended === 0) begin();
