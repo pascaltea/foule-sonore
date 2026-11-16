@@ -722,8 +722,13 @@ export function update(dt) {
     if (q.gest) q.gest.length = 0;
     c.pan.pan.setTargetAtTime(clamp(((s.x + s.w / 2) / GW - 0.5) * 1.7, -0.9, 0.9), now, 0.1);
     const op = q.open;       // bras ouverts : timbre plus clair, plus d'écho et d'espace
-    c.filt.frequency.setTargetAtTime((def.perc ? 4200 : 1000) * 2 ** (op * (def.perc ? 2 : 4)), now, 0.12);      // les percussions gardent toujours leur attaque
-    c.rv.gain.setTargetAtTime(def.rev * (0.6 + 0.9 * op), now, 0.2); c.dl.gain.setTargetAtTime(def.dly * (0.4 + 1.4 * op) + 0.22 * Math.max(0, op - 0.6), now, 0.2);
+    if (gest) {              // jeu par gestes : le son de l'atelier, tel quel. Timbre ouvert, même réverbération, quel que soit l'écart des bras.
+      c.filt.frequency.setTargetAtTime(16000, now, 0.05);
+      c.rv.gain.setTargetAtTime(def.rev * 1.2, now, 0.1); c.dl.gain.setTargetAtTime(def.dly, now, 0.1);
+    } else {
+      c.filt.frequency.setTargetAtTime((def.perc ? 4200 : 1000) * 2 ** (op * (def.perc ? 2 : 4)), now, 0.12);      // les percussions gardent toujours leur attaque
+      c.rv.gain.setTargetAtTime(def.rev * (0.6 + 0.9 * op), now, 0.2); c.dl.gain.setTargetAtTime(def.dly * (0.4 + 1.4 * op) + 0.22 * Math.max(0, op - 0.6), now, 0.2);
+    }
     if (q.peakCount !== lastPeak[i]) { lastPeak[i] = q.peakCount; if (c.on && !gest) c.accent = true; }
   }
 
