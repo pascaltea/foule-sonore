@@ -141,8 +141,8 @@ function updateTogether(dt) {
   } else if (d.lift > 0) d.lift = Math.max(0, d.lift - dt * 1.5);
 
   d.loudAge = n >= 2 && m.playing >= 2 && maxE > 0.3 ? 0 : d.loudAge + dt;
-  d.quietT = n >= 2 && maxE < 0.07 ? d.quietT + dt : 0;
-  if (!d.hush && d.quietT > 0.45 && d.loudAge < 2.2) { d.hush = true; d.hushT = 0; }
+  d.quietT = n >= 2 && maxE < 0.1 ? d.quietT + dt : 0;
+  if (!d.hush && d.quietT > 0.4 && d.loudAge < 4) { d.hush = true; d.hushT = 0; }       // le mouvement met près de 2 s à retomber
   if (d.hush) {
     d.hushT += dt;
     if (maxE > 0.16 || n < 2) { d.hush = false; if (d.hushT > 0.5 && n >= 2) { d.hushEnds++; d.gauge = clamp(d.gauge + 0.08); } }

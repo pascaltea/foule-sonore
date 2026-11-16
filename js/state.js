@@ -41,7 +41,7 @@ export function sanitizeSectors(arr) {
   });
 }
 
-const KEY = 'foule-sonore-acg5';
+const KEY = 'foule-sonore-acg6';
 let saved = {};
 try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { /* stockage indisponible */ }
 
@@ -124,8 +124,12 @@ export const state = {
     lift: 0, liftStarts: 0, liftCd: 0, drops: 0, hush: false, hushT: 0, hushEnds: 0, loudAge: 99, quietT: 0 },
   session: { on: false, t: 0, ended: 0, ends: 0, idle: 0 },
   ink: [0.03, 0.6, 0.36],
-  // Voyage : les escales de la session en cours, chacune devenue une strate du dôme (la plus récente en dernier).
-  journey: { bands: [], cur: '', t: 0, route: [], idx: 0, maxN: 0, wasOn: false, drops: 0, ends: 0, last: null },
+  // Qui est où : chaque personne suivie garde un numéro tant qu'elle reste sur scène, même en changeant de place.
+  who: { seq: 0, visited: new Map(), swaps: 0, jumps: 0 },
+  flood: 0,           // Genève déborde : 1 au moment du geste, puis retombe
+  // Voyage : les pays de la session en cours, chacun devenu une strate du dôme (le plus récent en dernier),
+  // et ce que la session dit du trio (traits, forme de la créature, portrait).
+  journey: { bands: [], cur: '', t: 0, route: [], idx: 0, maxN: 0, wasOn: false, drops: 0, ends: 0, last: null, overflows: 0, traits: null, form: null, done: 0 },
   music: {
     running: false, bpm: 90, beatPulse: 0, beatCount: 0, accent: 0, accentCount: 0, accentX: 0.5, accentY: 0.5,
     chord: 0, level: 0,

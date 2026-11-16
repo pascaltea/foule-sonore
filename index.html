@@ -41,6 +41,8 @@
   #zones div { padding: 4vh 2vw 0; text-align: center; opacity: .22; }
   #zones b { display: inline-block; padding-top: 1.2vh; border-top: 1px solid #fff; font: 400 clamp(10px, .95vw, 18px)/1 var(--title);
     text-transform: uppercase; letter-spacing: .34em; text-indent: .34em; color: #fff; }
+  #zones i { display: flex; justify-content: center; gap: 5px; margin-top: 1vh; }
+  #zones u { width: 14px; height: 2px; background: rgba(255,255,255,.25); text-decoration: none; } #zones u.on { background: #fff; }
   #note { position: fixed; bottom: 7vh; left: 50%; transform: translateX(-50%); padding: 8px 16px;
     border-radius: 4px; background: var(--bg); border: 1px solid var(--line); opacity: 0;
     transition: opacity .4s; pointer-events: none; max-width: 90vw; text-align: center; }
@@ -133,7 +135,7 @@
     font: 400 clamp(9px, .85vw, 15px)/1 var(--title); text-transform: uppercase; letter-spacing: .34em; color: #fff; }
   #cfg.on { opacity: .4; }
   #clock { position: fixed; left: 0; bottom: 0; height: 2px; width: 0; background: rgba(255,255,255,.45); pointer-events: none; }
-  #end { position: fixed; inset: 0 4vw 58vh; display: grid; place-content: center; gap: 1.4vh; text-align: center; pointer-events: none;
+  #end { position: fixed; inset: 0 4vw 50vh; display: grid; place-content: center; gap: 1.2vh; text-align: center; pointer-events: none;
     opacity: 0; transition: opacity 2s; font-family: var(--title); text-transform: uppercase; }
   #end.on { opacity: 1; }
   /* Écran d'attente : les créatures de la soirée, en mosaïque derrière l'invitation. */
@@ -143,8 +145,9 @@
   #gallery img { display: block; width: 100%; height: auto; mix-blend-mode: screen; }
   #gallery figcaption { position: absolute; left: 0; right: 0; top: 4px; text-align: center; font: 400 clamp(7px, .62vw, 11px)/1 var(--title); letter-spacing: .24em; text-transform: uppercase; color: #fff; opacity: .7; }
   body.wall #invite { inset: 0 4vw 58vh; }
-  #end b { font-weight: 400; font-size: clamp(20px, 3.4vw, 64px); letter-spacing: .26em; text-indent: .26em; color: #fff; }
-  #end small { font-size: clamp(10px, .95vw, 18px); letter-spacing: .34em; text-indent: .34em; color: #fff; opacity: .8; }
+  #end b { font-weight: 400; font-size: clamp(20px, 3vw, 58px); letter-spacing: .2em; text-indent: .2em; color: #fff; }
+  #end small { font-size: clamp(10px, .95vw, 18px); letter-spacing: .34em; text-indent: .34em; color: #fff; opacity: .7; }
+  #end p { max-width: min(62ch, 80vw); margin: 1.4vh auto 0; font: 400 clamp(14px, 1.45vw, 27px)/1.45 "Helvetica Neue", Helvetica, Arial, sans-serif; text-transform: none; color: #fff; }
   body.journey .jOff, body:not(.journey) .jOn { display: none; }
   body.group .crowdOnly { display: none !important; }
   body:not(.group) .groupOnly, body.trio .groupOnly { display: none !important; }
@@ -173,10 +176,10 @@
     <div class="row"><button id="netCopy">Copier le lien</button><button id="netNew" title="Coupe l'accès de tous les téléphones déjà reliés">Nouveau code</button></div>
   </div>
   <label class="check"><input id="journeyOn" type="checkbox"> Voyage : départ et retour à Genève</label>
-  <p class="hint">Mains levées ensemble : escale suivante (ou seule après 75 s). Chaque escale laisse une strate sur le dôme ; au final il devient une créature, gardée dans la galerie.</p>
+  <p class="hint">Le même voyage pour tous : Genève, trois pays d'environ une minute, retour à Genève. Mains levées ensemble : Genève déborde, et laisse une veine verte sur la créature. Au final elle prend la forme de leur façon de jouer, avec un surnom et un portrait.</p>
   <label>Escale</label>
   <select id="preset"></select>
-  <div class="row"><button id="nextStop">Escale suivante</button></div>
+  <div class="row"><button id="nextStop">Pays suivant</button><button id="overflowBtn" title="Déclenche le débordement sans attendre le geste du trio">Genève déborde</button></div>
   <div class="row"><button id="galExport" title="Toutes les créatures de la soirée en une image">Exporter la galerie</button><button id="galClear">Vider la galerie</button></div>
   <p class="hint" id="galCount"></p>
   <div class="row">
@@ -247,7 +250,7 @@
   <p class="eyebrow">Assemblée créative de Genève · Downtown Studio · 19 novembre 2026</p>
   <h1>Foule Sonore</h1>
   <p class="tag">Imaginons la Créature ensemble</p>
-  <h4><span class="jOn">Le voyage part de Genève et y revient · les escales</span><span class="jOff">Choisir une escale</span></h4>
+  <h4><span class="jOn">Le voyage part de Genève, traverse trois pays et y revient</span><span class="jOff">Choisir un pays</span></h4>
   <div id="presetPick"></div>
   <h4>Comment jouer</h4>
   <ul id="how">
@@ -256,7 +259,7 @@
     <li><b>Ouvrir les bras</b>Le son s'éclaircit et résonne. Bras serrés, il se feutre.</li>
     <li class="trioOnly"><b>Changer de place</b>Gauche, centre, droite : trois instruments. On passe de l'un à l'autre.</li>
     <li class="groupOnly"><b>Sauter</b>Un saut donne un accent.</li>
-    <li><b>Ensemble</b>Tous les mains en l'air : on change de pays. Tous immobiles d'un coup : silence.</li>
+    <li><b>Ensemble</b>Tous les mains en l'air : Genève déborde. Tous immobiles d'un coup : silence.</li>
   </ul>
   <div id="go"><button id="btnStart">Démarrer avec la caméra</button><button id="btnSim">Essayer sans caméra</button></div>
   <div id="modes"><button data-mode="trio">Scène à trois</button><button data-mode="group">Petit groupe</button><button data-mode="crowd">Foule</button></div>

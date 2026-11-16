@@ -15,7 +15,7 @@ export const status = { ready: false, loading: false, error: '' };
 export const slots = Array.from({ length: MAX_PLAYERS }, () => ({
   on: false, fresh: true, lost: 0, cx: 0, cy: 0, torso: 0.15,
   px: new Float32Array(NJ), py: new Float32Array(NJ), vx: new Float32Array(NJ), vy: new Float32Array(NJ), vis: new Float32Array(NJ),
-  tE: 0, tS: 0, tC: 0, tCy: 0.5, tOpen: 0.5, up: false, jumpAge: 9,
+  pid: 0, tE: 0, tS: 0, tC: 0, tCy: 0.5, tOpen: 0.5, up: false, jumpAge: 9,
 }));
 let landmarker = null, loading = null, lastVT = -1;
 
@@ -69,6 +69,7 @@ function ingestZones(cs, dt) {
     const o = slots[c.prev], s = slots[z];
     if (!s.on) {
       for (const k of ['px', 'py', 'vx', 'vy', 'vis']) s[k].set(o[k]);
+      s.pid = o.pid; state.who.swaps++; state.who.visited.get(s.pid)?.add(z);          // la même personne, à une autre place
       Object.assign(s, { torso: o.torso, cx: o.cx, cy: o.cy, jumpAge: o.jumpAge, tE: o.tE, tS: o.tS, tC: o.tC, tCy: o.tCy, tOpen: o.tOpen, up: o.up, on: true, fresh: false, lost: 0 });
       const q = state.sec[z], p = state.sec[c.prev];
       q.energy = p.energy; q.speed = p.speed; q.coherence = p.coherence; q.cy = p.cy; q.open = p.open; q.eFast = p.eFast; q.eSlow = p.eSlow;
@@ -79,7 +80,9 @@ function ingestZones(cs, dt) {
   slots.forEach((s, i) => {
     const c = i < ZONES ? best[i] : null;
     if (!c) { s.lost += dt; if (s.on && s.lost > 0.6) drop(s); return; }
-    if (!s.on || !c.same) s.fresh = true;       // nouvelle personne à cette place : on repart de ses gestes à elle
+    if (!s.on || !c.same) {                     // nouvelle personne à cette place : on repart de ses gestes à elle
+      s.fresh = true; s.pid = ++state.who.seq; state.who.visited.set(s.pid, new Set([i]));
+    }
     s.on = true;
     track(s, c, dt);
   });
@@ -142,7 +145,7 @@ function track(s, c, dt) {
   // Saut : les hanches montent vite.
   s.jumpAge += dt;
   s.jump = (s.vy[23] + s.vy[24]) / 2 / s.torso < -1.8 && s.jumpAge > 0.8;
-  if (s.jump) s.jumpAge = 0;
+  if (s.jump) { s.jumpAge = 0; state.who.jumps++; }
 }
 
 // ---------- Silhouettes simulées (test sans caméra) ----------

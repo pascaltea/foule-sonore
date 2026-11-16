@@ -4,7 +4,7 @@ import { GW, GH, GN, MAX_SECTORS, SECTOR_COLORS, ZONES, LAYOUTS, makeLayout, san
 import { SCALES, KEYS, INSTRUMENTS, PRESETS } from './music.js';
 import { endSession, newSession } from './metrics.js';
 import { setNet, netInfo, regieUrl } from './remote.js';
-import { gallery, nextStop, exportGallery, clearGallery } from './journey.js';
+import { gallery, nextStop, overflow, exportGallery, clearGallery } from './journey.js';
 import { PALETTES } from './visuals.js';
 import * as capture from './capture.js';
 import { slots, BONES, status as poseStatus, reset as resetPose } from './pose.js';
@@ -91,7 +91,7 @@ function sectorsChanged(rebuildList = true) {
   $('sectors').innerHTML = S.map((s) => `<div style="left:${s.x / GW * 100}%;top:${s.y / GH * 100}%;width:${s.w / GW * 100}%;height:${s.h / GH * 100}%;
     border-color:${s.color};color:${s.color}"><span>${esc(s.name)} · ${INSTRUMENTS[s.inst] || ''}</span></div>`).join('');
   // Scène à trois : un repère discret par place, au nom de son instrument, qui s'allume quand quelqu'un s'y tient.
-  $('zones').innerHTML = isTrio ? S.slice(0, ZONES).map((s) => `<div><b>${esc(INSTRUMENTS[s.inst] || '')}</b></div>`).join('') : '';
+  $('zones').innerHTML = isTrio ? S.slice(0, ZONES).map((s) => `<div><b>${esc(INSTRUMENTS[s.inst] || '')}</b><i><u></u><u></u><u></u></i></div>`).join('') : '';
   saveSettings();
 }
 
@@ -253,7 +253,7 @@ export function remoteState() {
     places: settings.sectors.slice(0, n).map((s, i) => ({ name: s.name, inst: s.inst, vol: s.vol, mute: s.mute, present: s.present !== false, on: state.sec[i].on, energy: +state.sec[i].energy.toFixed(2) })),
     gauge: +d.gauge.toFixed(3), phase: d.phase, attract: d.attract, hush: d.hush, lift: +d.lift.toFixed(2), bpm: Math.round(state.music.bpm),
     session: { on: ss.on, t: Math.floor(ss.t), ended: ss.ended > 0 },
-    stops: state.journey.bands.map((b) => PRESETS[b.id]?.name).filter(Boolean), creatures: gallery.n,
+    stops: state.journey.bands.map((b) => PRESETS[b.id]?.name).filter(Boolean), creatures: gallery.n, overflows: state.journey.overflows,
     set: { journey: settings.journey, volume: settings.volume, sensitivity: settings.sensitivity, dramaSpeed: settings.dramaSpeed, sessionMin: settings.sessionMin, scale: settings.scale, key: settings.key, hints: settings.hints, simulate: settings.simulate },
   };
 }
@@ -268,6 +268,7 @@ export function remoteApply(m) {
   else if (m.type === 'set' && m.key === 'hints') { settings.hints = !!m.value; sync(); }
   else if (m.type === 'set' && m.key === 'journey') { settings.journey = !!m.value; sync(); }
   else if (m.type === 'cmd' && m.name === 'next') nextStop();
+  else if (m.type === 'cmd' && m.name === 'overflow') overflow();
   else if (m.type === 'cmd' && m.name === 'end') endSession();
   else if (m.type === 'cmd' && m.name === 'new') newSession();
 }
@@ -304,7 +305,7 @@ export function init(h) {
   $('hintsOn').onchange = (e) => { settings.hints = e.target.checked; sync(); };
   $('sessNew').onclick = newSession; $('sessEnd').onclick = endSession; $('openRegie').onclick = openRegie;
   $('journeyOn').onchange = (e) => { settings.journey = e.target.checked; sync(); };
-  $('nextStop').onclick = nextStop;
+  $('nextStop').onclick = nextStop; $('overflowBtn').onclick = overflow;
   $('galExport').onclick = async () => { if (!(await exportGallery())) note('La galerie est encore vide.', 3000); };
   $('galClear').onclick = (e) => {            // deux clics pour vider : pas de fenêtre de confirmation
     if (performance.now() - clearArmed < 3000) { clearGallery(); e.target.textContent = 'Vider la galerie'; clearArmed = 0; note('Galerie vidée.', 2500); }
@@ -448,8 +449,8 @@ function hintList() {
   if (!group) return ['Elle vous écoute', 'Et si vous ne faisiez plus qu\'un ?', 'Faites trembler l\'air'];
   if (ss.t < 40) L.push('Elle vous écoute', 'Allez chercher la note la plus haute', 'Faites-vous immense');
   else L.push('Faites trembler l\'air', 'Devenez tout petit', 'Ralentissez, jusqu\'à presque rien', 'Touchez le ciel', 'Un bond, pour voir');
-  if (trio()) L.push('Et si vous changiez de place ?');
-  if (n >= 2) L.push(settings.journey ? 'Portez le ciel à plusieurs, il vous emmène ailleurs' : 'Portez le ciel à plusieurs', 'Retenez votre souffle, tous ensemble', 'Répondez-vous');
+  if (trio()) L.push('Et si vous changiez de place ?', 'Prenez la place de l\'autre');
+  if (n >= 2) L.push('Portez le ciel à plusieurs', 'Retenez votre souffle, tous ensemble', 'Répondez-vous', 'Laissez passer le plus discret');
   if (trio() && n > 0 && n < ZONES) L.push('Il manque quelqu\'un pour l\'éveiller');
   return L;
 }
@@ -472,12 +473,12 @@ function updateHints(now) {
   const last = state.journey.last;
   if (ss.ended > 0 && last && endShown !== last) {
     endShown = last;
-    $('end').innerHTML = `<b>Créature n° ${last.n}</b><small>née à ${last.at} ${esc(last.who)}</small><small>${last.stops.map(esc).join(' · ')}</small>`;
+    $('end').innerHTML = `<b>Créature n° ${last.n}, ${esc(last.nick)}</b><small>née à ${last.at} ${esc(last.who)}</small><p>${esc(last.text)}</p>`;
   }
   if (galleryShown !== gallery.version) {
     galleryShown = gallery.version;
     const items = gallery.items.slice(-24);
-    $('gallery').innerHTML = items.map((it) => `<figure><img src="${it.img}" alt=""><figcaption>n° ${it.n}</figcaption></figure>`).join('');
+    $('gallery').innerHTML = items.map((it) => `<figure><img src="${it.img}" alt=""><figcaption>${esc(it.nick || 'n° ' + it.n)}</figcaption></figure>`).join('');
     $('galCount').textContent = gallery.items.length ? `${gallery.items.length} créature${gallery.items.length > 1 ? 's' : ''} ce soir` : 'Galerie vide';
   }
   const wall = state.music.running && d.attract && ss.ended === 0 && gallery.items.length > 0;
@@ -505,6 +506,9 @@ export function update() {
     for (let i = 0; i < el.length; i++) {
       const q = state.sec[i], s = settings.sectors[i];
       el[i].style.opacity = (s.present ? (q.on ? 0.75 : 0.5) : 0.22) + 0.25 * q.pulse;
+      // Trois petits traits : les places que la personne qui se tient ici a déjà tenues.
+      const seen = s.present ? state.who.visited.get(slots[i].pid) : null, marks = el[i].lastElementChild.children;
+      for (let k = 0; k < marks.length; k++) marks[k].className = seen?.has(k) ? 'on' : '';
     }
   } else if (settings.showSectors) {            // le contour d'un secteur s'allume quand son instrument joue
     const el = $('sectors').children;
