@@ -45,6 +45,14 @@ export async function init() {
   state.music.running = true;
 }
 
+// Atelier des gestes (atelier.html) : le même moteur de sons, sans la partition automatique. La scène ne s'en sert pas.
+export async function initLab() {
+  if (!ac) { ac = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' }); build(); }
+  await ac.resume();
+  pad.level.gain.value = 0; pad.lfoGain.gain.value = 0; master.gain.value = 0.4;
+  return { ac, chan, INST, PRESETS, SCALES, mtof, deg2midi, v: { kick, snare, hat, crash, drum, tap, thump, pianoNote, bassNote, violinNote } };
+}
+
 function build() {
   // Sortie : volume général -> limiteur -> haut-parleurs.
   limiter = ac.createDynamicsCompressor();
@@ -423,7 +431,7 @@ const tap = (t, vol, dest, f = 3000, q = 1.2, r = 0.012) => noise({ t, vol, dest
 // légère qui n'arrive que si l'on bouge assez. u = les deux frappes de l'unisson, g = frappe fantôme.
 function perc(label, level, pats, strokes) {
   return {
-    label, level, rev: 0.14, dly: 0, perc: true,
+    label, level, rev: 0.14, dly: 0, perc: true, strokes, pats,
     play(x) {
       if (x.climax) { if (x.uni < 0) return false; strokes[pats.u[x.uni % 2]](x, 1); return true; }
       const ch = pats[x.lvl][x.s16];
@@ -442,7 +450,7 @@ function perc(label, level, pats, strokes) {
 // Mélodique : chaque instrument ne décrit que sa note ; le phrasé (énergie, vitesse, régularité) est commun.
 function mel(label, level, rev, dly, oct, one, extra = {}) {
   return {
-    label, level, rev, dly,
+    label, level, rev, dly, one, oct,
     play(x) { if (!x.hit || (extra.gate && !extra.gate(x))) return false; one(x, note(x, melDeg(x), oct), 1); extra.under?.(x); return true; },
     accent: extra.accent || ((x) => { for (let i = 0; i < 6; i++) one({ ...x, t: x.t + i * x.sd / 2 }, note(x, x.r + i, oct), 0.8 + i * 0.04); }),
   };
@@ -526,7 +534,7 @@ function scheduleStep(s, t) {
   const r = prog[chordIdx];
 
   // Battement de cœur : toujours là, même dans le calme.
-  if (s16 === 0 || (s16 === 3 && !chan.some((c) => c.on))) drum(t, mtof(base), s16 ? 0.25 : 0.4, bus.pad, 0.2);
+  if (state.m.energy > 0.03 && !d.attract && !d.hush && (s16 === 0 || (s16 === 3 && !chan.some((c) => c.on)))) drum(t, mtof(base), s16 ? 0.25 : 0.4, bus.pad, 0.2);
 
   if (d.hush || state.session.ended > 0) return;      // silence collectif, ou fin de session : seule la nappe reste
 
