@@ -68,7 +68,7 @@ export function describe(t, group = true) {
   const out = [a, ...facts.slice(0, 2)];
   return { nick, text: out.join(' ') };
 }
-export const whoOf = (n, group = true) => (!group ? 'd\'une foule' : n <= 1 ? 'd\'une personne seule' : `de ${['deux', 'trois', 'quatre', 'cinq'][Math.min(n, 5) - 2]} inconnus`);
+export const whoOf = (n, group = true) => (!group ? 'd\'une foule' : n <= 1 ? 'd\'une personne seule' : ['d\'un duo', 'd\'un trio', 'd\'un quatuor', 'd\'un quintette'][Math.min(n, 5) - 2]);   // sans genre : le groupe peut être n'importe qui
 
 // Le code d'une créature : tout ce qu'il faut pour la redessiner et réécrire son portrait, en quelques dizaines de
 // caractères. C'est lui que porte le lien (et le code QR) : aucune donnée n'est stockée ailleurs.

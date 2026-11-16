@@ -489,7 +489,7 @@ function updateHints(now) {
   const last = state.journey.last;
   if (ss.ended > 0 && last && endShown !== last) {
     endShown = last;
-    $('end').innerHTML = `<b>Créature n° ${last.n}, ${esc(last.nick)}</b><small>née à ${last.at} ${esc(last.who)}</small><p>${esc(last.text)}</p>`;
+    $('end').innerHTML = `<b>Créature n° ${last.n}, ${esc(last.nick)}</b><small>née à ${last.at} ${esc(last.who)}</small>`;
     // Son lien tient tout entier dans ce code QR : chacun repart avec sa créature.
     if (last.code) { $('takeQr').innerHTML = ''; qr($('takeQr'), creatureUrl(last.code)); }
   }

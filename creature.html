@@ -43,7 +43,7 @@ if (it) {
   document.title = `Créature n° ${it.n}, ${it.nick} · Assemblée créative de Genève`;
   $('name').textContent = `Créature n° ${it.n}, ${it.nick}`;
   $('born').textContent = `née à ${it.at} ${it.who}`;
-  $('text').textContent = it.text;
+  $('text').remove();
   $('stops').textContent = it.stops.join(' · ');
   const l = new Living($('c'), it, { dust: 2600 });
   animate(() => [l]);

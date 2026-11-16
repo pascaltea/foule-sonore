@@ -179,10 +179,6 @@ export async function exportGallery() {
       g.drawImage(im, x, y, cw, ch);
       g.fillStyle = '#fff'; g.font = '400 19px Anton, Impact, sans-serif'; g.fillText(`CRÉATURE N° ${it.n}${it.nick ? ', ' + it.nick.toUpperCase() : ''}`, x + 8, y + ch + 8);
       g.fillStyle = '#888'; g.font = '12px Helvetica, Arial, sans-serif'; g.fillText(`née à ${it.at} ${it.who}`, x + 8, y + ch + 36);
-      g.fillStyle = '#ccc'; g.font = '14px Helvetica, Arial, sans-serif';
-      let line = '', ly = y + ch + 58;
-      for (const w of (it.text || '').split(' ')) { if (g.measureText(line + w).width > cw - 16) { g.fillText(line.trim(), x + 8, ly); ly += 19; line = ''; } line += w + ' '; }
-      g.fillText(line.trim(), x + 8, ly);
       ok();
     };
     im.onerror = ok; im.src = it.img;

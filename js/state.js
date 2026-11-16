@@ -68,7 +68,8 @@ export const settings = Object.assign({
   preset: 'geneve',   // configuration d'instruments (voir PRESETS dans music.js)
   custom: false,      // un instrument a été changé à la main depuis le choix de la configuration
   sessionMin: 5,      // durée d'une session en minutes ; 0 = libre
-  hints: true,        // consignes de jeu affichées au public
+  hints: false,       // consignes de jeu affichées au public (masquées par défaut, à activer dans les réglages ou la régie)
+  rev: 7,
   journey: true,      // voyage aller-retour depuis Genève : les gestes collectifs font changer d'escale
   remoteOn: false,    // régie sur téléphone, par Internet
   room: '',           // code secret du canal de régie
@@ -83,7 +84,7 @@ export const settings = Object.assign({
   debug: false,
   dramaSpeed: 2,
   showSectors: true,
-}, saved, { simulate: false, simPreset: 3, simSector: -1 });
+}, saved, { simulate: false, simPreset: 3, simSector: -1 }, saved.rev === 7 ? {} : { hints: false, rev: 7 });   // rev 7 : consignes masquées par défaut, une fois pour toutes
 if (settings.mode !== 'crowd') settings.mode = 'group';
 export const trio = () => settings.mode === 'group' && settings.zones;
 // settings.sectors désigne toujours la configuration du mode actif ; celle de l'autre mode attend dans « stash ».

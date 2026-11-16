@@ -530,10 +530,7 @@ function scheduleStep(s, t) {
 
   if (d.hush || state.session.ended > 0) return;      // silence collectif, ou fin de session : seule la nappe reste
 
-  if (d.attract) {     // mode attraction : quelques cloches qui invitent à bouger
-    if (s16 % 8 === 0 && Math.random() < 0.6) bellNote(t, mtof(deg2midi((Math.random() * n * 2) | 0, base + 36, iv)), 0.16, bus.fx, 0.9);
-    return;
-  }
+  if (d.attract) return;     // personne ne bouge : aucun son
 
   const uni = climax ? UNISON.indexOf(s16) : -1;
   const S = settings.sectors;
@@ -623,7 +620,9 @@ export function update(dt) {
   const det = 5 + 22 * (1 - m.coherence);
   pad.voices.forEach((o) => { o[0].detune.setTargetAtTime(-det, now, 0.5); o[1].detune.setTargetAtTime(det, now, 0.5); });
   pad.lfoGain.gain.setTargetAtTime(quiet ? 0.16 : 0.04, now, 1);          // la nappe respire au calme
-  pad.level.gain.setTargetAtTime(d.hush ? 0.05 : quiet ? 0.3 : 0.1 + 0.25 * d.lift, now, d.hush ? 0.15 : 1.5);
+  // Immobilité parfaite = silence complet : la nappe ne sonne que si quelqu'un bouge (ou tient les mains levées).
+  const moving = Math.max(clamp((m.energy - 0.02) * 20), d.lift);
+  pad.level.gain.setTargetAtTime(d.hush ? 0 : (quiet ? 0.3 : 0.1 + 0.25 * d.lift) * moving, now, d.hush ? 0.15 : moving < 0.05 ? 0.35 : 1.5);
   master.gain.setTargetAtTime(settings.volume * 0.4, now, 0.15);      // marge : le limiteur reste une sécurité
 
   if (d.tierUps !== lastTierUps) {           // palier franchi : montée puis impact
