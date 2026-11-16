@@ -53,6 +53,14 @@ export async function initLab() {
   return { ac, chan, INST, PRESETS, SCALES, mtof, deg2midi, v: { kick, snare, hat, crash, drum, tap, thump, pianoNote, bassNote, violinNote } };
 }
 
+// Le son tel qu'il sort, pour l'enregistrement du morceau (record.js).
+let tapNode = null;
+export function tapStream() {
+  if (!ac) return null;
+  if (!tapNode) { tapNode = ac.createMediaStreamDestination(); limiter.connect(tapNode); }
+  return tapNode.stream;
+}
+
 function build() {
   // Sortie : volume général -> limiteur -> haut-parleurs.
   limiter = ac.createDynamicsCompressor();
@@ -530,8 +538,10 @@ function scheduleStep(s, t) {
   const sig = settings.scale + settings.key;
   if (sig !== lastSig) { lastSig = sig; chordIdx %= prog.length; changed = true; }
   if (changed) setChord(t);
+  if (gestMode() && !settings.snap) return;      // jeu par gestes : aucune note ni pulsation qui ne vienne d'un geste
   if (s16 % 4 === 0) queue.push({ t, beat: 1 });
   const r = prog[chordIdx];
+  if (gestMode()) return;
 
   // Battement de cœur : toujours là, même dans le calme.
   if (state.m.energy > 0.03 && !d.attract && !d.hush && (s16 === 0 || (s16 === 3 && !chan.some((c) => c.on)))) drum(t, mtof(base), s16 ? 0.25 : 0.4, bus.pad, 0.2);
@@ -591,6 +601,78 @@ function swapInst(c, s, now) {
   c.inst = INST[s.inst] ? s.inst : 'piano'; c.pos = 0; c.accent = false;
 }
 
+// ---------- Jeu par gestes : chaque geste joue un son, rejouable à l'identique ----------
+// La hauteur de la main choisit la note dans la gamme du pays ; la vivacité du geste donne la force. Rien n'est
+// tiré au hasard et rien ne sonne sans geste. Percussions = frappes, place de droite = chant, le reste = harmonie.
+export const gestMode = () => settings.play === 'gestes' && settings.mode === 'group';
+const SUSTAINED = { violin: 1, bansuri: 1, shakuhachi: 1, ney: 1, choir: 1 };
+function gWhen(now) {
+  const t0 = now + 0.004;
+  if (!settings.snap) return t0;
+  const g = 60 / bpm / 4;
+  return nextT + Math.ceil((t0 - nextT) / g) * g;
+}
+function gTone(c, id, def, deg, v, len, t) {
+  const { iv, n, base } = scaleInfo(), f = (oct) => mtof(deg2midi(deg, base + oct, iv)), d = c.in;
+  if (id === 'piano') pianoNote(t, f(24), 0.55 * v, d, 0.3 + len * 0.6);
+  else if (id === 'violin') violinNote(c, t, f(24), 0.3 * v, len);
+  else if (id === 'bass') bassNote(t, f(12), 0.9 * v, d, Math.min(0.5, len));
+  else if (id === 'marimba') marimbaNote(t, f(24), 0.6 * v, d);
+  else if (id === 'bells') bellNote(t, f(36), 0.4 * v, d, 0.3 + len * 0.5);
+  else if (id === 'choir') choirChord(t, [f(24)], 0.5 * v, d, len, 0.05);
+  else if (def.one) def.one({ t, d, c, sd: len / 3, lvl: 1, s16: 1, climax: true, r: 0, n, iv, base, oct: 0 }, f(def.oct), v);
+}
+function gStroke(c, id, def, lv, v, t) {      // lv : 0 grave, 1 médium, 2 clair
+  const d = c.in, { iv, base } = scaleInfo();
+  if (id === 'drums') { if (lv === 0) kick(t, 0.95 * v, d, false); else if (lv === 1) snare(t, 0.55 * v, d); else hat(t, 0.3 * v, d, true); }
+  else if (id === 'congas') {
+    if (lv === 0) drum(t, mtof(deg2midi(0, base + 12, iv)), 0.6 * v, d, 0.13);
+    else if (lv === 1) drum(t, mtof(deg2midi(2, base + 12, iv)), 0.55 * v, d, 0.09);
+    else tap(t, 0.6 * v, d, 2600, 0.9, 0.02);
+  } else if (def.strokes) {
+    const keys = [def.pats.u[0], def.pats.u[1], def.pats.g];
+    def.strokes[keys[lv] in def.strokes ? keys[lv] : keys[1]]({ t, d, base }, v);
+  }
+}
+function playGesture(i, c, s, def, e, now) {
+  const id = c.inst, t = gWhen(now), v = e.v ?? 0.7, h = e.h ?? 0.4, { n } = scaleInfo(), deg = Math.round(h * (2 * n - 1)), sus = SUSTAINED[id];
+  const chant = i === 2 || sus, T = (dg, vv, len, tt) => gTone(c, id, def, dg, vv, len, tt), K = (lv, vv, tt) => gStroke(c, id, def, lv, vv, tt);
+  const big = e.type === 'ouvrir' || e.type === 'lever' || e.type === 'sauter';
+  if (def.perc) {
+    const lv = h < 0.24 ? 0 : h < 0.5 ? 1 : 2;
+    if (e.type === 'frapper') K(lv, v, t);
+    else if (e.type === 'ouvrir') { for (let k = 0; k < 5; k++) K(1, 0.35 + 0.13 * k, t + [0, 0.07, 0.13, 0.18, 0.22][k]); K(2, 1, t + 0.26); if (id === 'drums') crash(t + 0.26, 0.4, c.in); else K(0, 0.9, t + 0.26); }
+    else if (e.type === 'refermer') { K(2, 1, t); tap(t, 0.5, c.in, 3200, 1.2, 0.015); }
+    else if (e.type === 'pousser') { K(0, 1, t); thump(t, 46, 1, c.in, 0.4, 900); }
+    else if (e.type === 'balayer') K(2, 0.4 + 0.3 * v, t);
+    else if (e.type === 'lever') { let tt = t; for (let k = 0; k < 9; k++) { K(k % 2, 0.3 + 0.07 * k, tt); tt += 0.12 - 0.008 * k; } K(0, 1, tt); K(2, 1, tt); }
+    else if (e.type === 'accroupir') K(0, 0.8, t);
+    else if (e.type === 'sauter') { K(0, 1, t); K(2, 1, t); K(1, 0.8, t + 0.09); }
+  } else if (e.type === 'frapper') T(deg, v, sus ? 0.7 : 0.5, t);
+  else if (e.type === 'ouvrir') { if (sus) T(deg + n, 1, 1.2, t); else [0, 2, 4, n].forEach((k, j) => T(deg + k, 0.6 + 0.1 * j, 0.9, t + j * 0.035)); }
+  else if (e.type === 'refermer') {
+    if (sus && c.viol) { c.viol.g.gain.cancelScheduledValues(t); c.viol.g.gain.setTargetAtTime(0, t, 0.02); c.viol.end = -1; }
+    else { T(deg, 0.8, 0.1, t); T(deg + n, 0.6, 0.1, t + 0.07); }
+  } else if (e.type === 'pousser') { if (chant) { T(deg - 1, 0.7, 0.1, t); T(deg, 1, 1, t + 0.09); } else T(-n, 1, 1.2, t); }
+  else if (e.type === 'balayer') { c.gSweep = e.first ? deg : (c.gSweep ?? deg) + e.dir; T(c.gSweep, 0.5 + 0.3 * v, sus ? 0.25 : 0.4, t); }
+  else if (e.type === 'lever') { if (sus) T(2 * n - 1, 1, 1.5, t); else for (let k = 0; k < 6; k++) T(deg - 2 + k, 0.5 + 0.08 * k, k === 5 ? 1 : 0.2, t + k * 0.06); }
+  else if (e.type === 'accroupir') T(-n, 0.8, 0.8, t);
+  else if (e.type === 'sauter') { if (chant) for (let k = 0; k < 6; k++) T(deg + k, 0.6 + 0.06 * k, k === 5 ? 0.8 : 0.15, t + k * 0.045); else [-n, 0, 2, 4, n].forEach((k, j) => T(deg + k, 0.8, 1, t + j * 0.008)); }
+  c.gAt = now; state.music.gestes = (state.music.gestes || 0) + 1;
+  queue.push({ t, sec: i });
+  if (big) queue.push({ t, accent: 1, x: (s.x + s.w / 2) / GW, y: (s.y + s.h / 2) / GH });
+}
+// Instruments tenus (violon, flûtes) : tant que la main bouge, la note suit sa hauteur. La main s'arrête, la note s'éteint.
+function sustainGesture(i, c, s, def, q, now) {
+  if (!SUSTAINED[c.inst] || q.gstill || !q.gspeed) return;
+  const k = q.gspeed[0] > q.gspeed[1] ? 0 : 1, sp = q.gspeed[k];
+  if (sp < 1.1 || now - (c.gSus || -9) < 0.09) return;
+  c.gSus = now; c.gAt = now;
+  const { n } = scaleInfo();
+  gTone(c, c.inst, def, Math.round(q.gh[k] * (2 * n - 1)), Math.min(1, 0.35 + sp / 9), 0.24, gWhen(now));
+  if (now - (c.gVis || -9) > 0.25) { c.gVis = now; queue.push({ t: now, sec: i }); }
+}
+
 // ---------- Mise à jour à chaque image : mapping foule -> musique ----------
 export function update(dt) {
   if (!ac) return;
@@ -607,21 +689,29 @@ export function update(dt) {
   dly.delayTime.setTargetAtTime(60 / bpm * 0.75, now, 0.3);
 
   // Secteurs : chacun ouvre son instrument selon sa propre énergie (seuil avec hystérésis).
-  const ended = state.session.ended > 0, quiet = d.attract || m.still || d.hush || ended, S = settings.sectors;
+  const ended = state.session.ended > 0, quiet = d.attract || m.still || d.hush || ended, S = settings.sectors, gest = gestMode();
   for (let i = 0; i < MAX_SECTORS; i++) {
     const c = chan[i], s = S[i], q = state.sec[i];
     if (!s) { c.on = q.on = false; c.level.gain.setTargetAtTime(0, now, 0.2); continue; }
     const def = INST[s.inst] || INST.piano;
     swapInst(c, s, now);
     const e = q.energy;
-    c.on = q.on = !s.mute && s.present !== false && !quiet && (climax || (c.on ? e > 0.07 : e > 0.12));
-    const amt = climax ? Math.max(e, 0.7) : release ? e * 0.6 : e;
-    c.level.gain.setTargetAtTime(c.on ? def.level * s.vol * (0.4 + 0.6 * amt) : 0, now, 0.25);
+    if (gest) {
+      c.on = !s.mute && s.present !== false && !ended;
+      c.level.gain.setTargetAtTime(c.on ? def.level * s.vol : 0, now, 0.04);
+      if (c.on) { for (const g of q.gest || []) if (settings.gestes.includes(g.type)) playGesture(i, c, s, def, g, now); sustainGesture(i, c, s, def, q, now); }
+      q.on = c.on && now - (c.gAt || -9) < 1.2;          // « joue » = un son est parti il y a moins d'une seconde
+    } else {
+      c.on = q.on = !s.mute && s.present !== false && !quiet && (climax || (c.on ? e > 0.07 : e > 0.12));
+      const amt = climax ? Math.max(e, 0.7) : release ? e * 0.6 : e;
+      c.level.gain.setTargetAtTime(c.on ? def.level * s.vol * (0.4 + 0.6 * amt) : 0, now, 0.25);
+    }
+    if (q.gest) q.gest.length = 0;
     c.pan.pan.setTargetAtTime(clamp(((s.x + s.w / 2) / GW - 0.5) * 1.7, -0.9, 0.9), now, 0.1);
     const op = q.open;       // bras ouverts : timbre plus clair, plus d'écho et d'espace
     c.filt.frequency.setTargetAtTime((def.perc ? 4200 : 1000) * 2 ** (op * (def.perc ? 2 : 4)), now, 0.12);      // les percussions gardent toujours leur attaque
     c.rv.gain.setTargetAtTime(def.rev * (0.6 + 0.9 * op), now, 0.2); c.dl.gain.setTargetAtTime(def.dly * (0.4 + 1.4 * op) + 0.22 * Math.max(0, op - 0.6), now, 0.2);
-    if (q.peakCount !== lastPeak[i]) { lastPeak[i] = q.peakCount; if (c.on) c.accent = true; }
+    if (q.peakCount !== lastPeak[i]) { lastPeak[i] = q.peakCount; if (c.on && !gest) c.accent = true; }
   }
 
   pad.filter.frequency.setTargetAtTime(280 + 2200 * m.energy ** 1.5 + 300 * d.tier + 2600 * d.lift, now, 0.25);
@@ -630,13 +720,13 @@ export function update(dt) {
   pad.lfoGain.gain.setTargetAtTime(quiet ? 0.16 : 0.04, now, 1);          // la nappe respire au calme
   // Immobilité parfaite = silence complet : la nappe ne sonne que si quelqu'un bouge (ou tient les mains levées).
   const moving = Math.max(clamp((m.energy - 0.02) * 20), d.lift);
-  pad.level.gain.setTargetAtTime(d.hush ? 0 : (quiet ? 0.3 : 0.1 + 0.25 * d.lift) * moving, now, d.hush ? 0.15 : moving < 0.05 ? 0.35 : 1.5);
+  pad.level.gain.setTargetAtTime(gest ? 0.25 * d.lift : d.hush ? 0 : (quiet ? 0.3 : 0.1 + 0.25 * d.lift) * moving, now, d.hush ? 0.15 : moving < 0.05 ? 0.35 : 1.5);
   master.gain.setTargetAtTime(settings.volume * 0.4, now, 0.15);      // marge : le limiteur reste une sécurité
 
   if (d.tierUps !== lastTierUps) {           // palier franchi : montée puis impact
     lastTierUps = d.tierUps;
     const dur = 60 / bpm * (climax ? 4 : 2);
-    riser(now, dur); impact(now + dur, 0.9); queue.push({ t: now + dur, accent: 1, x: 0.5, y: 0.5 });
+    if (!gest) riser(now, dur); impact(now + dur, 0.9); queue.push({ t: now + dur, accent: 1, x: 0.5, y: 0.5 });
   }
 
   // Gestes collectifs. Mains en l'air ensemble : montée, puis grande frappe. Silence ensemble : la reprise claque.

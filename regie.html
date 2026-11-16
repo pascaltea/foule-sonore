@@ -60,6 +60,8 @@
 <div class="row"><button id="new">Nouvelle session (N)</button><button id="end">Final (Entrée)</button></div>
 <label class="check"><input id="journey" type="checkbox"> Voyage : départ et retour à Genève</label>
 <label class="check"><input id="hints" type="checkbox"> Invitations à l'écran</label>
+<label class="check"><input id="play" type="checkbox"> Jeu par gestes (un geste, un son)</label>
+<label class="check"><input id="snap" type="checkbox"> Calage sur une pulsation (secours)</label>
 
 <h2>Son</h2>
 <div class="grid">
@@ -112,7 +114,7 @@ function render() {
     row.querySelector('[data-f=mute]').classList.toggle('active', p.mute);
   });
   for (const k of ['volume', 'sensitivity', 'dramaSpeed', 'sessionMin', 'scale', 'key']) if (idle($(k))) $(k).value = st.set[k];
-  $('hints').checked = st.set.hints; $('journey').checked = st.set.journey;
+  $('hints').checked = st.set.hints; $('journey').checked = st.set.journey; $('play').checked = st.set.play !== 'flux'; $('snap').checked = !!st.set.snap;
   $('vVol').textContent = Math.round(st.set.volume * 100) + ' %'; $('vSens').textContent = (+st.set.sensitivity).toFixed(2); $('vDrama').textContent = '×' + st.set.dramaSpeed;
   const t = st.session.t, dur = st.set.sessionMin * 60;
   $('time').textContent = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}` + (dur ? ` / ${st.set.sessionMin}:00` : '');
@@ -150,6 +152,8 @@ for (const k of ['volume', 'sensitivity', 'dramaSpeed']) $(k).oninput = (e) => s
 for (const k of ['sessionMin', 'key']) $(k).onchange = (e) => send({ type: 'set', key: k, value: +e.target.value });
 $('scale').onchange = (e) => send({ type: 'set', key: 'scale', value: e.target.value });
 $('hints').onchange = (e) => send({ type: 'set', key: 'hints', value: e.target.checked });
+$('play').onchange = (e) => send({ type: 'set', key: 'play', value: e.target.checked ? 'gestes' : 'flux' });
+$('snap').onchange = (e) => send({ type: 'set', key: 'snap', value: e.target.checked });
 $('journey').onchange = (e) => send({ type: 'set', key: 'journey', value: e.target.checked });
 $('next').onclick = () => send({ type: 'cmd', name: 'next' });
 $('over').onclick = () => send({ type: 'cmd', name: 'overflow' });

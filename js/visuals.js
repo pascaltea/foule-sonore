@@ -114,6 +114,7 @@ function respawn(i, A) {
   px[i] = clamp(x, 0.001, 0.999); py[i] = clamp(y, 0.001, 0.999); vx[i] = 0; vy[i] = 0; life[i] = 1.5 + Math.random() * 4;
 }
 
+let holdK = 1;
 function stepParticles(dt, t, count, attract) {
   const { x: FX, y: FY, act: A } = state.flow, m = state.m, d = state.drama, map = state.cellSector;
   const aspect = fw / fh, beat = state.music.beatPulse;
@@ -196,7 +197,9 @@ export function render(dt, t) {
   const q = QUALITY[state.perf.quality];
   const show = state.session.ended > 0;       // présentation de la créature : la brume vit toute seule
   const count = Math.floor(MAX * q.n * (show ? 0.7 : attract ? 0.3 : 0.15 + 0.85 * m.energy));
-  stepParticles(dt, t, count, attract);
+  // Tout le monde est immobile : la brume reste en suspens, presque figée, jusqu'au prochain geste.
+  holdK += ((!attract && !show && m.energy < 0.02 ? 0.05 : 1) - holdK) * Math.min(1, dt * 3);
+  stepParticles(dt * holdK, t, count, attract);
 
   // La palette glisse avec l'harmonie ; les accents déclenchent flash et onde de choc.
   harm += (mu.chord * 0.17 + d.tier * 0.06 - harm) * Math.min(1, dt * 1.5);

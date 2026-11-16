@@ -3,6 +3,7 @@
 // Les images sont analysées sur place : rien n'est enregistré ni envoyé.
 import { GW, GH, MAX_PLAYERS, ZONES, state, settings, trio, clamp, smooth, rebuildSectorMap } from './state.js';
 import { video, splat, simJumping } from './capture.js';
+import { Gestes } from './gestes.js';
 
 const VER = '0.10.14', CDN = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${VER}`;
 const MODEL = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
@@ -16,6 +17,7 @@ export const slots = Array.from({ length: MAX_PLAYERS }, () => ({
   on: false, fresh: true, lost: 0, cx: 0, cy: 0, torso: 0.15,
   px: new Float32Array(NJ), py: new Float32Array(NJ), vx: new Float32Array(NJ), vy: new Float32Array(NJ), vis: new Float32Array(NJ),
   pid: 0, tE: 0, tS: 0, tC: 0, tCy: 0.5, tOpen: 0.5, up: false, jumpAge: 9,
+  g: new Gestes(ASPECT, true), ev: [],
 }));
 let landmarker = null, loading = null, lastVT = -1;
 
@@ -69,6 +71,7 @@ function ingestZones(cs, dt) {
     const o = slots[c.prev], s = slots[z];
     if (!s.on) {
       for (const k of ['px', 'py', 'vx', 'vy', 'vis']) s[k].set(o[k]);
+      const tg = s.g; s.g = o.g; o.g = tg; s.ev.length = 0;                             // ses gestes en cours la suivent
       s.pid = o.pid; state.who.swaps++; state.who.visited.get(s.pid)?.add(z);          // la même personne, à une autre place
       Object.assign(s, { torso: o.torso, cx: o.cx, cy: o.cy, jumpAge: o.jumpAge, tE: o.tE, tS: o.tS, tC: o.tC, tCy: o.tCy, tOpen: o.tOpen, up: o.up, on: true, fresh: false, lost: 0 });
       const q = state.sec[z], p = state.sec[c.prev];
@@ -114,6 +117,8 @@ function ingest(poses, dt) {
 
 function track(s, c, dt) {
   const p = c.p;
+  if (s.fresh) { s.g = new Gestes(ASPECT, true); s.ev.length = 0; }
+  for (const e of s.g.step(p, dt)) s.ev.push(e);          // les gestes reconnus sur cette image (voir gestes.js)
   for (let k = 0; k < NJ; k++) {
     const x = p[k].x, y = p[k].y;
     if (s.fresh) { s.px[k] = x; s.py[k] = y; s.vx[k] = s.vy[k] = 0; }
@@ -207,6 +212,9 @@ export function update(dt) {
     q.coherence = smooth(q.coherence, s.on ? s.tC : 0, dt, 0.5, 1.0);
     if (s.on) q.cy = smooth(q.cy, s.tCy, dt, 0.15);
     q.open = smooth(q.open, s.on ? s.tOpen : 0.5, dt, 0.2); q.up = s.on && s.up;
+    // Jeu par gestes : ce que la musique lira à cette image.
+    q.gest = s.on ? s.ev.splice(0) : []; if (!s.on) s.ev.length = 0;
+    q.gh = s.g.cont.h; q.gspeed = s.g.cont.speed; q.gstill = !s.on || s.g.cont.still;
     q.eFast = smooth(q.eFast, e, dt, 0.1); q.eSlow = smooth(q.eSlow, e, dt, 1.5);
     q.peakAge += dt;
     if (s.on && (s.jump || q.eFast - q.eSlow > 0.3) && q.peakAge > 1.2) { q.peakCount++; q.peakAge = 0; }

@@ -187,6 +187,7 @@
   <select id="preset"></select>
   <div class="row"><button id="nextStop">Pays suivant</button><button id="overflowBtn" title="Déclenche le débordement sans attendre le geste du trio">Genève déborde</button></div>
   <div class="row"><button id="galExport" title="Toutes les créatures de la soirée en une image">Exporter la galerie</button><button id="galClear">Vider la galerie</button></div>
+  <div class="row"><button id="recExport" title="Un fichier son par créature, à me transmettre après la soirée">Exporter les morceaux</button></div>
   <label class="check"><input id="galOn" type="checkbox"> Galerie en ligne, et code QR de chaque créature</label>
   <div class="row"><button id="galLink">Copier le lien de la galerie</button><button id="galData" title="Le fichier à déposer sur le site pour garder la galerie après la soirée">Exporter les données</button></div>
   <p class="hint"><span id="galCount"></span> <span id="galInfo"></span></p>
@@ -195,6 +196,8 @@
   </div>
   <div class="row"><button id="sessNew">Nouvelle session</button><button id="sessEnd">Final</button></div>
   <label class="check"><input id="hintsOn" type="checkbox"> Invitations à l'écran</label>
+  <label class="check" title="Chaque geste joue un son. Décoché : l'ancienne partition guidée par le mouvement."><input id="playOn" type="checkbox"> Jeu par gestes (un geste, un son)</label>
+  <label class="check" title="Secours : chaque son attend le prochain temps d'une pulsation commune"><input id="snapOn" type="checkbox"> Calage sur une pulsation</label>
   <label>Mode</label>
   <select id="mode"><option value="trio">Scène à trois (gauche, centre, droite)</option><option value="group">Petit groupe (1 à 5 personnes suivies)</option><option value="crowd">Foule (secteurs de l'espace)</option></select>
   <label>Caméra</label>

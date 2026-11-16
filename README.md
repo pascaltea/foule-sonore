@@ -111,3 +111,25 @@ Les réglages sont mémorisés dans le navigateur ; les boutons Exporter / Impor
 ## Crédits
 
 Titres en Anton (SIL Open Font License, voir `fonts/OFL-Anton.txt`). Bibliothèques embarquées dans `vendor/` : MQTT.js et qrcode-generator (licence MIT).
+
+## Jeu par gestes (par défaut en scène à trois)
+
+Chaque geste joue un son, rejouable à l'identique. La hauteur de la main choisit la note dans la gamme du pays, la vivacité du geste donne la force. Rien ne sonne sans geste : immobilité = silence, et la brume reste en suspens.
+
+| Geste | Rythme (gauche) | Harmonie (centre) | Chant (droite) |
+|---|---|---|---|
+| Frapper | frappe grave, médium ou claire selon la hauteur | une note | note piquée ou appuyée |
+| Ouvrir les bras | roulement qui éclate | accord égrené | la note bondit à l'octave |
+| Refermer les mains | claque sèche | deux notes étouffées | la note se coupe |
+| Balayer | chapelet de frappes légères | arpège qui suit la main | glissé de note en note |
+| Lever les deux mains | roulement qui accélère | gamme vers l'aigu | note la plus haute, tenue |
+| Sauter | grand coup | accord plaqué | trait rapide |
+
+Violon et flûtes : la note suit la main tant qu'elle bouge. « Pousser vers l'avant » et « s'accroupir » existent dans `js/gestes.js` mais ne sont pas actifs en scène (`settings.gestes`).
+
+- **Secours** (réglages `H` ou régie) : décocher « Jeu par gestes » ramène l'ancienne partition guidée par le mouvement ; « Calage sur une pulsation » aligne chaque son sur un temps commun.
+- **Atelier** : `atelier.html` permet d'essayer chaque geste seul, avec le geste reconnu affiché.
+
+## Le morceau de chaque session
+
+Le son produit par l'ordinateur (jamais la salle) est enregistré pendant chaque session et gardé dans le navigateur de l'ordinateur de scène, sous le numéro de la créature. Après la soirée : réglages, « Exporter les morceaux », puis déposer les fichiers dans `morceaux/` à la racine du dépôt (`morceaux/12.webm` pour la créature n° 12). La page de la créature affiche alors un lecteur.

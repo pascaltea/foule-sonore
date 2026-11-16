@@ -13,6 +13,7 @@ import { splat } from './capture.js';
 import { GW, GH } from './state.js';
 import { PLAIN, auraBreath, auraTint } from './creature-draw.js';
 import { formOf, describe, whoOf, encode, decode } from './portrait.js';
+import * as record from './record.js';
 
 const GKEY = 'foule-sonore-galerie', TOUR = ['mali', 'levant', 'inde', 'japon', 'caraibes'], MAX_ITEMS = 48, STOPS = 3;
 export const gallery = { n: 0, items: [], version: 0 };
@@ -37,6 +38,7 @@ function begin() {
   Object.assign(J, { bands: [], cur: '', t: 0, route: [...TOUR.slice(k), ...TOUR.slice(0, k)], idx: 0, maxN: 0, drops: d.drops, overflows: 0, traits: null, form: null, done: 0 });
   A = { T: 0, e: 0, open: 0, tog: 0, early: [0, 0], late: [0, 0], share: new Map(), first: new Map(), firsts: 0, await: true,
     hush0: d.hushEnds, jumps0: W.jumps, swaps0: W.swaps, startN: 0, startT: 0 };
+  record.start();                        // le morceau de cette session
   W.visited.clear();                     // nouvelle session : chacun repart de la place où il se tient
   slots.forEach((sl, i) => { if (sl.on && sl.pid) W.visited.set(sl.pid, new Set([i])); });
   if (settings.journey && settings.preset !== 'geneve') applyPreset('geneve');
@@ -85,6 +87,7 @@ function finish() {
   gallery.items.push(item); if (gallery.items.length > MAX_ITEMS) gallery.items.shift();
   save(); gallery.version++;
   handlers.onCreature?.(item);
+  record.end(n);                         // le morceau porte le numéro de la créature
 }
 const handlers = {};
 export function onCreature(fn) { handlers.onCreature = fn; }
@@ -100,7 +103,8 @@ export function update(dt) {
 
   if (ss.on && !J.wasOn && ss.ended === 0) begin();
   J.wasOn = ss.on;
-  if (!ss.on) { if (J.bands.length) { J.bands = []; J.cur = ''; J.form = null; J.done = 0; A = null; } return; }
+  if (!ss.on) { if (J.bands.length) { J.bands = []; J.cur = ''; J.form = null; J.done = 0; A = null; if (!J.wasEnded) record.cancel(); } J.wasEnded = false; return; }
+  if (ss.ended > 0) J.wasEnded = true;
   if (ss.ended > 0) {
     if (ss.ends !== J.ends && A) { J.ends = ss.ends; finish(); }
     // Présentation de la créature : la brume ne dépend plus des joueurs, elle prend le tempérament du trio.

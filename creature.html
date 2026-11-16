@@ -44,6 +44,9 @@ if (it) {
   $('name').textContent = `Créature n° ${it.n}, ${it.nick}`;
   $('born').textContent = `née à ${it.at} ${it.who}`;
   $('text').remove();
+  // Le morceau du trio, s'il a été publié après la soirée.
+  const au = new Audio(`morceaux/${it.n}.webm`); au.controls = true; au.preload = 'metadata'; au.style.cssText = 'display:block;margin:3vh auto 0;max-width:90%';
+  au.onloadedmetadata = () => $('stops').after(au);
   $('stops').textContent = it.stops.join(' · ');
   const l = new Living($('c'), it, { dust: 2600 });
   animate(() => [l]);

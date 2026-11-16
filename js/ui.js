@@ -8,6 +8,7 @@ import { decode } from './portrait.js';
 import { Living, animate } from './creature-draw.js';
 import { gallery, nextStop, overflow, exportGallery, clearGallery } from './journey.js';
 import { PALETTES } from './visuals.js';
+import * as record from './record.js';
 import * as capture from './capture.js';
 import { slots, BONES, status as poseStatus, reset as resetPose } from './pose.js';
 
@@ -56,7 +57,7 @@ function sync() {
   $('mode').value = mk;
   document.querySelectorAll('[data-mode]').forEach((b) => b.classList.toggle('active', b.dataset.mode === mk));
   $('invite').firstElementChild.textContent = INVITE[mk][0]; $('invite').lastElementChild.textContent = INVITE[mk][1];
-  $('preset').value = settings.preset; $('sessionMin').value = settings.sessionMin; $('hintsOn').checked = settings.hints;
+  $('preset').value = settings.preset; $('sessionMin').value = settings.sessionMin; $('hintsOn').checked = settings.hints; $('playOn').checked = settings.play !== 'flux'; $('snapOn').checked = settings.snap;
   $('galOn').checked = settings.onlineGallery;
   $('journeyOn').checked = settings.journey; document.body.classList.toggle('journey', settings.journey);
   document.querySelectorAll('[data-preset]').forEach((b) => b.classList.toggle('active', b.dataset.preset === settings.preset && !settings.custom));
@@ -171,7 +172,7 @@ function deleteSelected() {
 }
 
 // ---------- Export / import de la configuration ----------
-const CFG_KEYS = ['journey', 'sensitivity', 'scale', 'key', 'volume', 'palette', 'dramaSpeed', 'showSectors', 'zones', 'creature', 'preset', 'custom', 'sessionMin', 'hints'];
+const CFG_KEYS = ['journey', 'sensitivity', 'scale', 'key', 'volume', 'palette', 'dramaSpeed', 'showSectors', 'zones', 'creature', 'preset', 'custom', 'sessionMin', 'hints', 'play', 'snap'];
 function exportConfig() {
   const cfg = { type: 'foule-sonore', version: 4, sectors: configOf('crowd'), players: playersConfig() };
   CFG_KEYS.forEach((k) => { cfg[k] = settings[k]; });
@@ -262,7 +263,7 @@ export function remoteState() {
     gauge: +d.gauge.toFixed(3), phase: d.phase, attract: d.attract, hush: d.hush, lift: +d.lift.toFixed(2), bpm: Math.round(state.music.bpm),
     session: { on: ss.on, t: Math.floor(ss.t), ended: ss.ended > 0 },
     stops: state.journey.bands.map((b) => PRESETS[b.id]?.name).filter(Boolean), creatures: gallery.n, overflows: state.journey.overflows,
-    set: { journey: settings.journey, volume: settings.volume, sensitivity: settings.sensitivity, dramaSpeed: settings.dramaSpeed, sessionMin: settings.sessionMin, scale: settings.scale, key: settings.key, hints: settings.hints, simulate: settings.simulate },
+    set: { journey: settings.journey, volume: settings.volume, sensitivity: settings.sensitivity, dramaSpeed: settings.dramaSpeed, sessionMin: settings.sessionMin, scale: settings.scale, key: settings.key, hints: settings.hints, play: settings.play, snap: settings.snap, simulate: settings.simulate },
   };
 }
 export function remoteApply(m) {
@@ -274,6 +275,8 @@ export function remoteApply(m) {
   else if (m.type === 'set' && REMOTE_SET[m.key]) { const [a, b] = REMOTE_SET[m.key]; settings[m.key] = m.key === 'key' ? Math.round(clamp(+m.value, a, b)) : clamp(+m.value, a, b); syncInputs(); sync(); }
   else if (m.type === 'set' && m.key === 'scale' && SCALES[m.value]) { settings.scale = m.value; syncInputs(); sync(); }
   else if (m.type === 'set' && m.key === 'hints') { settings.hints = !!m.value; sync(); }
+  else if (m.type === 'set' && m.key === 'play') { settings.play = m.value === 'flux' ? 'flux' : 'gestes'; syncInputs(); sync(); }
+  else if (m.type === 'set' && m.key === 'snap') { settings.snap = !!m.value; syncInputs(); sync(); }
   else if (m.type === 'set' && m.key === 'journey') { settings.journey = !!m.value; sync(); }
   else if (m.type === 'cmd' && m.name === 'next') nextStop();
   else if (m.type === 'cmd' && m.name === 'overflow') overflow();
@@ -311,6 +314,9 @@ export function init(h) {
   $('preset').onchange = (e) => applyPreset(e.target.value);
   $('sessionMin').onchange = (e) => { settings.sessionMin = +e.target.value; sync(); };
   $('hintsOn').onchange = (e) => { settings.hints = e.target.checked; sync(); };
+  $('playOn').onchange = (e) => { settings.play = e.target.checked ? 'gestes' : 'flux'; sync(); };
+  $('snapOn').onchange = (e) => { settings.snap = e.target.checked; sync(); };
+  $('recExport').onclick = async () => { const n = await record.exportAll(); note(n ? `${n} morceau${n > 1 ? 'x' : ''} téléchargé${n > 1 ? 's' : ''}.` : 'Aucun morceau enregistré pour l\'instant.', 4000); };
   $('sessNew').onclick = newSession; $('sessEnd').onclick = endSession; $('openRegie').onclick = openRegie;
   $('journeyOn').onchange = (e) => { settings.journey = e.target.checked; sync(); };
   $('nextStop').onclick = nextStop; $('overflowBtn').onclick = overflow;

@@ -9,8 +9,9 @@ export const GESTES = {
 const SH = [11, 12], WR = [15, 16], HIP = [23, 24], NJ = 33;
 
 export class Gestes {
-  constructor(aspect = 16 / 9) {
-    this.A = aspect; this.fresh = true; this.torso = 0.15;
+  // mirror : l'image est déjà en miroir (scène) ; le sens du balayage suit alors l'écran.
+  constructor(aspect = 16 / 9, mirror = false) {
+    this.A = aspect; this.M = mirror ? -1 : 1; this.fresh = true; this.torso = 0.15;
     this.p = Array.from({ length: NJ }, () => ({ x: 0, y: 0, z: 0, vx: 0, vy: 0, vis: 0 }));
     this.hand = [0, 1].map(() => ({ peak: 0, arm: false, col: 0, sweep: false, cool: 0 }));
     this.D = 1; this.dD = 0; this.canOpen = true; this.canClose = false; this.canUp = true; this.canPush = true;
@@ -90,8 +91,8 @@ export class Gestes {
       const side = Math.abs(vx) > 3.5 && Math.abs(vx) > 1.6 * Math.abs(vy) && other < 2.5 && !this.block && !o.sweep;
       const col = Math.floor(P[k].x * A / T / 0.4);
       if (side) {
-        if (H.sweep && col !== H.col) ev.push({ type: 'balayer', hand: i, dir: vx < 0 ? 1 : -1, v: clamp(Math.abs(vx) / 12, 0.3, 1), h: c.h[i], first: false });
-        else if (!H.sweep) ev.push({ type: 'balayer', hand: i, dir: vx < 0 ? 1 : -1, v: clamp(Math.abs(vx) / 12, 0.3, 1), h: c.h[i], first: true });
+        if (H.sweep && col !== H.col) ev.push({ type: 'balayer', hand: i, dir: (vx < 0 ? 1 : -1) * this.M, v: clamp(Math.abs(vx) / 12, 0.3, 1), h: c.h[i], first: false });
+        else if (!H.sweep) ev.push({ type: 'balayer', hand: i, dir: (vx < 0 ? 1 : -1) * this.M, v: clamp(Math.abs(vx) / 12, 0.3, 1), h: c.h[i], first: true });
         H.sweep = true; H.arm = false; H.peak = 0;
       } else if (Math.abs(vx) < 2) H.sweep = false;
       H.col = col;

@@ -70,6 +70,9 @@ export const settings = Object.assign({
   sessionMin: 5,      // durée d'une session en minutes ; 0 = libre
   hints: false,       // consignes de jeu affichées au public (masquées par défaut, à activer dans les réglages ou la régie)
   rev: 7,
+  play: 'gestes',     // 'gestes' : chaque geste joue un son (un instrument) ; 'flux' : l'ancienne partition guidée par le mouvement
+  snap: false,        // jeu par gestes : cale chaque son sur une pulsation commune (secours si trois débutants se dispersent)
+  gestes: ['frapper', 'ouvrir', 'refermer', 'balayer', 'lever', 'sauter'],
   journey: true,      // voyage aller-retour depuis Genève : les gestes collectifs font changer d'escale
   remoteOn: false,    // régie sur téléphone, par Internet
   room: '',           // code secret du canal de régie
