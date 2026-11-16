@@ -6,7 +6,7 @@
 <title>Foule Sonore · Assemblée créative de Genève</title>
 <style>
   /* Direction artistique de l'Assemblée créative de Genève : fond noir, titres en capitales étroites,
-     jaune / magenta / vert des trois panels. */
+     jaune / magenta / vert des titres des affiches. */
   @font-face { font-family: "Anton"; src: url("fonts/anton-latin-400-normal.woff2") format("woff2"); font-display: block; }
   :root { --ink: #fff; --dim: #b4b4b4; --line: rgba(255,255,255,.16); --bg: rgba(0,0,0,.88);
     --p1: #ffff54; --p2: #ff67ff; --p3: #0ae600; --accent: var(--p1);
@@ -27,15 +27,15 @@
   #gauge.climax #gaugeFill { animation: throb .45s ease-in-out infinite alternate; }
   @keyframes throb { to { filter: brightness(1.7); } }
 
-  #invite { position: fixed; inset: 0 4vw 12vh; display: grid; place-content: center; justify-items: center; gap: 2.2vh;
+  #invite { position: fixed; inset: 15vh 4vw 55vh; display: grid; place-content: center; justify-items: center; gap: 1.6vh;
     pointer-events: none; text-align: center; opacity: 0; transition: opacity 1.5s; }
   #invite b, #invite small { animation: breathe 3.2s ease-in-out infinite; }
-  #invite b { font: 400 9vw/0.98 var(--title); text-transform: uppercase; letter-spacing: .01em; color: #fff; }
+  #invite b { font: 400 min(7.6vw, 15vh)/0.98 var(--title); text-transform: uppercase; letter-spacing: .01em; color: #fff; }
   #invite small { font: 400 clamp(13px, 1.7vw, 30px)/1.2 var(--title); text-transform: uppercase; letter-spacing: .2em; color: var(--p1); }
   #invite.on { opacity: 1; }
   @keyframes breathe { 50% { opacity: .5; } }
 
-  /* Scène à trois : un bandeau par place, à la couleur de son panel. */
+  /* Scène à trois : un bandeau par place, à sa couleur. */
   #zones { position: fixed; inset: 0; pointer-events: none; display: none; grid-template-columns: repeat(3, 1fr); }
   #zones.on { display: grid; }
   #zones div { padding: 3.5vh 2vw 0; text-align: center; opacity: .3; }
@@ -165,7 +165,7 @@
   <label class="crowdOnly">Découpage</label>
   <select id="layout" class="crowdOnly"></select>
   <div id="secList"></div>
-  <p class="hint trioOnly">La scène est partagée en trois places : gauche, centre, droite, vues depuis la salle (l'écran fait miroir). Qui se tient dans une place en joue l'instrument ; changer de place, c'est changer d'instrument. Bouger joue, lever les mains monte dans l'aigu, des gestes rapides accélèrent le rythme, sauter donne un accent. Seul, on éveille la Créature ; à deux, elle se lève ; il faut jouer à trois pour la faire rayonner.</p>
+  <p class="hint trioOnly">La scène est partagée en trois places : gauche, centre, droite, vues depuis la salle (l'écran fait miroir). Qui se tient dans une place en joue l'instrument ; changer de place, c'est changer d'instrument. Bouger joue, lever les mains monte dans l'aigu, des gestes rapides accélèrent le rythme, sauter donne un accent. Seul, on tire la Créature du sommeil ; à deux, elle ouvre grand les yeux ; il faut jouer à trois pour la réveiller tout à fait.</p>
   <p class="hint groupOnly">Chaque personne détectée reçoit un instrument, dans l'ordre d'arrivée, et le garde tant qu'elle reste dans le champ. Bouger joue, lever les mains monte dans l'aigu, des gestes rapides accélèrent le rythme, sauter donne un accent.</p>
   <p class="hint crowdOnly">Sur la grille debug (<kbd>D</kbd>) : glisser dans le vide pour créer un secteur, glisser un secteur pour le déplacer, ses bords pour le redimensionner, <kbd>Suppr</kbd> pour l'effacer. 6 secteurs au plus.</p>
   <label class="check"><input id="showSec" type="checkbox"> <span class="crowdOnly" style="float:none">Afficher les secteurs au public</span><span class="groupOnly" style="float:none">Afficher le cadre de chaque personne</span><span class="trioOnly" style="float:none">Afficher les trois places au public</span></label>
@@ -184,7 +184,7 @@
     <h1>Foule Sonore</h1>
     <p class="tag"><i style="color:var(--p1)">Imaginons</i> <i style="color:var(--p2)">la Créature</i> <i style="color:var(--p3)">ensemble</i></p>
     <div id="modes"><button data-mode="trio">Scène à trois</button><button data-mode="group">Petit groupe</button><button data-mode="crowd">Foule</button></div>
-    <p class="trioOnly">Trois personnes, trois places, trois instruments : à gauche, au centre, à droite. Chacune joue le sien avec tout le corps, et c'est ensemble qu'elles réveillent la Créature. La caméra sert uniquement à suivre les gestes : aucune image n'est affichée, enregistrée ni envoyée.</p>
+    <p class="trioOnly">Trois personnes, trois places, trois instruments : à gauche, au centre, à droite. Chacune joue le sien avec tout le corps, et c'est ensemble qu'elles réveillent la Créature de l'affiche. La caméra sert uniquement à suivre les gestes : aucune image n'est affichée, enregistrée ni envoyée.</p>
     <p class="crowdOnly">Le mouvement de la foule devient musique et lumière. La caméra sert uniquement à mesurer le mouvement : aucune image n'est affichée, enregistrée ni envoyée.</p>
     <p class="groupOnly">De 1 à 5 personnes : chacune devient un instrument, joué avec tout le corps. La caméra sert uniquement à suivre les gestes : aucune image n'est affichée, enregistrée ni envoyée.</p>
     <button id="btnStart">Démarrer avec la caméra</button>

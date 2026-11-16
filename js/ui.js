@@ -1,5 +1,5 @@
 // Régie : panneau de réglages, éditeur de secteurs, raccourcis clavier, jauge, affichage debug.
-import { GW, GH, GN, MAX_SECTORS, SECTOR_COLORS, ZONES, ZONE_SIDES, LAYOUTS, makeLayout, sanitizeSectors, rebuildSectorMap,
+import { GW, GH, GN, MAX_SECTORS, SECTOR_COLORS, ZONES, LAYOUTS, makeLayout, sanitizeSectors, rebuildSectorMap,
   state, settings, saveSettings, clamp, setMode, configOf, setConfig, sanitizePlayers, playersConfig, trio } from './state.js';
 import { SCALES, KEYS, INSTRUMENTS } from './music.js';
 import { PALETTES } from './visuals.js';
@@ -83,8 +83,8 @@ function sectorsChanged(rebuildList = true) {
   }
   $('sectors').innerHTML = S.map((s) => `<div style="left:${s.x / GW * 100}%;top:${s.y / GH * 100}%;width:${s.w / GW * 100}%;height:${s.h / GH * 100}%;
     border-color:${s.color};color:${s.color}"><span>${esc(s.name)} · ${INSTRUMENTS[s.inst] || ''}</span></div>`).join('');
-  // Scène à trois : un bandeau par place, au nom du panel, qui s'allume quand quelqu'un s'y tient.
-  $('zones').innerHTML = isTrio ? S.slice(0, ZONES).map((s, i) => `<div style="color:${s.color}"><em>${ZONE_SIDES[i]}</em><b>${esc(s.name)}</b><span></span></div>`).join('') : '';
+  // Scène à trois : un bandeau par place, au nom de son instrument, qui s'allume quand quelqu'un s'y tient.
+  $('zones').innerHTML = isTrio ? S.slice(0, ZONES).map((s) => `<div style="color:${s.color}"><em>${esc(s.name)}</em><b>${esc(INSTRUMENTS[s.inst] || '')}</b><span></span></div>`).join('') : '';
   saveSettings();
 }
 
@@ -353,7 +353,7 @@ export function update() {
   if (settings.showSectors && trio()) {
     const el = $('zones').children;
     for (let i = 0; i < el.length; i++) {
-      const q = state.sec[i], s = settings.sectors[i], txt = s.present ? INSTRUMENTS[s.inst] || '' : 'Place libre';
+      const q = state.sec[i], s = settings.sectors[i], txt = s.present ? '\u00a0' : 'Place libre';
       el[i].style.opacity = (s.present ? (q.on ? 0.8 : 0.55) : 0.3) + 0.2 * q.pulse;
       if (el[i].lastElementChild.textContent !== txt) el[i].lastElementChild.textContent = txt;
     }

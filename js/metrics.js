@@ -132,8 +132,8 @@ export function updateDrama(dt) {
     // Bouger ne suffit pas : c'est bouger ensemble qui remplit la jauge.
     const coop = m.energy * (0.1 + 0.9 * m.coherence * m.coherence);
     const next = clamp(d.gauge + dt * k * (0.024 * coop - 0.004 - 0.006 * (1 - m.energy)));
-    // Scène à trois : chaque personne qui joue ouvre un étage de plus. Seul, on éveille la Créature ;
-    // à deux, elle se lève ; il faut être trois pour la faire rayonner.
+    // Scène à trois : chaque personne qui joue ouvre un étage de plus. Seul, on tire la Créature du sommeil ;
+    // à deux, elle ouvre grand les yeux ; il faut être trois pour la réveiller tout à fait.
     const cap = trio() ? [0.12, 0.34, 0.64, 1][m.playing] : 1;
     d.gauge = next <= cap ? next : Math.max(cap, Math.min(next, d.gauge - dt * 0.05));
     if (d.gauge >= 1) { d.phase = 'climax'; d.phaseT = 0; d.tierUps++; }

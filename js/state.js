@@ -4,7 +4,6 @@ export const MAX_SECTORS = 6;
 // Couleurs de l'Assemblée créative de Genève : les trois titres des affiches, puis leurs trois décors.
 export const SECTOR_COLORS = ['#ffff54', '#ff67ff', '#0ae600', '#0a86c8', '#ff7a0a', '#0a7048'];
 export const ZONES = 3;           // scène à trois : gauche, centre, droite
-export const ZONE_SIDES = ['Gauche', 'Centre', 'Droite'];
 const DEF_INST = ['drums', 'piano', 'violin', 'bass', 'marimba', 'bells'];
 
 // Découpages prédéfinis : rectangles en fractions de l'image [x, y, largeur, hauteur].
@@ -42,14 +41,14 @@ export function sanitizeSectors(arr) {
   });
 }
 
-const KEY = 'foule-sonore-acg';
+const KEY = 'foule-sonore-acg2';
 let saved = {};
 try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { /* stockage indisponible */ }
 
 // Mode « petit groupe » : une personne suivie = un instrument. Le rectangle suit la personne à chaque image.
-// En scène à trois, les trois premiers emplacements sont les places gauche, centre et droite : un panel, un instrument.
+// En scène à trois, les trois premiers emplacements sont les places gauche, centre et droite : une place, un instrument.
 export const MAX_PLAYERS = 5;
-const DEF_PLAYERS = [['Faire émerger & connecter', 'drums'], ['Transmettre', 'piano'], ['Rayonner', 'violin'], ['Personne 4', 'marimba'], ['Personne 5', 'bass']];
+const DEF_PLAYERS = [['Gauche', 'drums'], ['Centre', 'piano'], ['Droite', 'violin'], ['Personne 4', 'marimba'], ['Personne 5', 'bass']];
 export function sanitizePlayers(arr) {
   return Array.from({ length: MAX_PLAYERS }, (_, i) => {
     const s = (Array.isArray(arr) && arr[i]) || {};
