@@ -48,7 +48,7 @@ export function render(dt, t) {
   glow = smooth(glow, ended ? 0.95 : idle ? 0.42 + 0.08 * Math.sin(t * 0.7) : d.hush ? 0.08 : sleeping ? 0.12 : d.lift > 0 ? 0.5 + 0.5 * d.lift :
     climax ? 1 : 0.2 + 0.6 * d.gauge + 0.2 * clamp(m.energy) + 0.5 * state.flood, dt, 0.6, 1.4);
   eyes = smooth(eyes, ended || climax ? 1 : clamp((d.gauge - 0.66) / 0.3), dt, 0.5, 1.2);
-  aura = smooth(aura, ended ? 1.5 : idle || sleeping ? 0.25 : 0.3 + 0.5 * d.gauge, dt, 1.2);
+  aura = smooth(aura, ended ? 1 : idle || sleeping ? 0.25 : 0.3 + 0.5 * d.gauge, dt, 1.2);
   life = smooth(life, ended ? 1 : 0, dt, 0.8);         // à la fin elle bouge un peu et écarquille les yeux
   gaze.step(dt);
   if (mu.accentCount !== lastAccent) { lastAccent = mu.accentCount; hop = 1; }
