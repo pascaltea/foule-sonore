@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Régie · Creatura</title>
+<title>Régie · Kinesia</title>
 <style>
   /* Régie : à ouvrir dans le même navigateur que la scène (autre fenêtre, autre écran). Elle pilote la scène en direct. */
   @font-face { font-family: "Anton"; src: url("fonts/anton-latin-400-normal.woff2") format("woff2"); }
@@ -145,7 +145,7 @@ setInterval(() => {
   const ok = Date.now() - lastSeen < (room ? 4500 : 1500);
   $('link').classList.toggle('ok', ok);
   $('link').textContent = ok ? (room ? 'Reliée à la scène · par Internet' : 'Reliée à la scène')
-    : !room ? 'Scène introuvable : ouvrez Creatura dans ce même navigateur'
+    : !room ? 'Scène introuvable : ouvrez Kinesia dans ce même navigateur'
     : relayUp ? 'Scène introuvable : activez « Régie sur téléphone » sur la scène' : 'Connexion au relais… (Internet requis)';
   if (!ok) send({ type: 'hello' });
 }, 900);

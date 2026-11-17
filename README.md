@@ -1,6 +1,6 @@
-# Creatura
+# Kinesia
 
-Anciennement « Foule Sonore » : le dépôt, l'adresse du site et les clés techniques gardent ce nom.
+Anciennement « Foule Sonore », puis « Creatura » : le dépôt, l'adresse du site et les clés techniques gardent ce nom.
 
 Installation interactive : le mouvement d'une foule, filmée par une webcam, devient musique et lumière en temps réel.
 
