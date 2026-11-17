@@ -150,3 +150,11 @@ Genève, Mali, Inde, Japon, Levant, Caraïbes, Amérique latine (cajón, guitare
 - **Créature** (touche `M`) : « révélée à la fin » par défaut. Elle se calcule sans être dessinée pendant le jeu et apparaît à la fin avec son code QR. « Visible » la dessine pendant le jeu ; « aucune » supprime créature, code QR et entrée de galerie.
 - **Performances** (touche `P`) : images par seconde du rendu et du suivi du corps, temps de suivi par image, sons par seconde, délai estimé entre geste et son.
 - En scène à trois, le suivi ne cherche que trois corps. Le mouvement des bras ne déclenche pas plus de dix sons par seconde et par personne.
+
+## Sons enregistrés
+
+Les instruments jouent de vraies notes enregistrées (`samples/`, environ 5 Mo, chargées en tâche de fond au démarrage, le pays en cours d'abord). Tant qu'un instrument n'est pas chargé, ou sans connexion, l'ancienne voix de synthèse prend le relais. Sources et licences : `samples/CREDITS.md`. Les niveaux ont été alignés par mesure sur ceux des anciennes voix.
+
+## La créature
+
+Retirée de l'expérience le 17/11/2026 : plus de créature, d'écran de présentation, de code QR ni de galerie. La fin de session affiche « Merci ». Le code correspondant reste dans le dépôt, inactif (`settings.creatureMode`). Le morceau de chaque session reste enregistré, nommé par son heure.

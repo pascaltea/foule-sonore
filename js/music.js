@@ -2,6 +2,7 @@
 // Un bourdon commun + un instrument par secteur, joué par la foule qui s'y trouve.
 // Tous les secteurs partagent tempo, gamme et grille d'accords.
 import { GW, GH, MAX_SECTORS, state, settings, clamp } from './state.js';
+import { SAMPLE_SETS, PERC_FILES } from './samples.js';
 
 export const SCALES = {
   pentaMin: { label: 'Pentatonique mineure', iv: [0, 3, 5, 7, 10] },
@@ -42,7 +43,7 @@ export async function init() {
   if (ac) { await ac.resume(); return; }
   ac = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
   await ac.resume();
-  build(); loadPiano();
+  build(); loadPiano(); loadAllSamples();
   nextT = ac.currentTime + 0.15;
   setInterval(tick, 25);
   state.music.running = true;
@@ -52,14 +53,16 @@ export async function init() {
 export async function initLab() {
   if (!ac) { ac = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' }); build(); }
   await ac.resume(); await loadPiano();
+  if (!PBUF.conga) await Promise.all(PERC_FILES.map(async (k) => { try { PBUF[k] = await smpBuf(`perc/${k}.mp3`); } catch { /* frappe absente */ } }));
   pad.level.gain.value = 0; pad.lfoGain.gain.value = 0; master.gain.value = 0.4;
   // Les mêmes fonctions que la scène : ce qu'on entend dans l'atelier est ce qu'on entendra sur scène.
   const sec = { x: 0, y: 0, w: 0, h: 0 };
   return {
     ac, chan, INST, PRESETS, SCALES, mtof, deg2midi,
     pianoSamples(on) { pianoSamples = on; return PIANO.filter((p) => p.buf).length; },
-    gesture(place, inst, e) { const c = chan[place]; playGesture(place, c, sec, INST[inst], e, ac.currentTime); queue.length = 0; },
-    sustain(place, inst, q) { sustainGesture(place, chan[place], sec, INST[inst], q, ac.currentTime); queue.length = 0; },
+    gesture(place, inst, e) { const c = chan[place]; curInst = inst; playGesture(place, c, sec, INST[inst], e, ac.currentTime); curInst = ''; queue.length = 0; },
+    sustain(place, inst, q) { curInst = inst; sustainGesture(place, chan[place], sec, INST[inst], q, ac.currentTime); curInst = ''; queue.length = 0; },
+    samples(on) { useSamples = on; }, needSamples, gains(sg, pg) { Object.assign(SMP_GAIN, sg); Object.assign(PERC_GAIN, pg); },
     use(place, inst) { const c = chan[place], def = INST[inst], now = ac.currentTime; swapInst(c, { inst }, now); chan.forEach((k) => k.level.gain.setTargetAtTime(k === c ? def.level : 0, now, 0.04)); c.rv.gain.setTargetAtTime(def.rev * 1.2, now, 0.1); c.dl.gain.setTargetAtTime(def.dly, now, 0.1); c.filt.frequency.setTargetAtTime(16000, now, 0.05); },
   };
 }
@@ -192,25 +195,134 @@ function thump(t, f, vol, dest, decay, click = 1800) {
   noise({ t, vol: vol * 0.4, dest, type: 'bandpass', f: click, q: 0.9, r: 0.012 });
 }
 function kick(t, vol, dest, pump) {
+  if (percHit('kick', t, vol, dest)) return;
   voice({ f: 52, fFrom: 160, glide: 0.1, t, dur: 0.02, vol, dest, a: 0.002, r: 0.11 }); thump(t, 52, vol, dest, 0.11, 2200);
   if (pump) { duck.gain.setTargetAtTime(0.5, t, 0.006); duck.gain.setTargetAtTime(1, t + 0.06, 0.09); }
 }
 const snare = (t, vol, dest) => {
+  if (percHit('snare', t, vol * 1.6, dest)) return;
   noise({ t, vol, dest, type: 'bandpass', f: 1900, q: 0.8, r: 0.05 });
   voice({ type: 'triangle', f: 185, t, dur: 0.01, vol: vol * 0.6, dest, r: 0.03 });
 };
 const hat = (t, vol, dest, open) => noise({ t, vol, dest, f: open ? 6000 : 8500, a: open ? 0.004 : 0.001, r: open ? 0.07 : 0.014 });
-const crash = (t, vol, dest) => noise({ t, vol, dest, f: 4500, a: 0.002, r: 0.35 });
+const crash = (t, vol, dest) => { if (!percHit('crash', t, vol * 2, dest)) noise({ t, vol, dest, f: 4500, a: 0.002, r: 0.35 }); };
 function marimbaNote(t, f, vol, dest) {
+  if (shot(t, f, vol, dest)) return;
   voice({ f, t, dur: 0.01, vol, dest, a: 0.002, r: 0.11 });
   voice({ f: f * 4, t, dur: 0.005, vol: vol * 0.22, dest, a: 0.001, r: 0.025 });
 }
 function bellNote(t, f, vol, dest, long = 0.5) {
+  if (shot(t, f, vol, dest)) return;
   voice({ f, t, dur: 0.01, vol, dest, a: 0.002, r: long });
   voice({ f: f * 2.76, t, dur: 0.01, vol: vol * 0.3, dest, a: 0.002, r: long * 0.5 });
   voice({ f: f * 5.4, t, dur: 0.005, vol: vol * 0.12, dest, a: 0.001, r: long * 0.2 });
 }
 // Piano : marteau (bruit bref), cordes légèrement désaccordées, timbre qui s'assombrit en résonnant.
+// ---------- Instruments enregistrés ----------
+// Les instruments jouent de vraies notes enregistrées (samples/), transposées au plus de deux demi-tons. Sources :
+// FluidR3_GM (Frank Wen, CC BY 3.0) pour les instruments mélodiques, VSCO 2 Community Edition (Versilian Studios,
+// CC0) pour les percussions. Tant qu'un jeu n'est pas chargé, la voix de synthèse d'origine prend le relais.
+const INST_SET = {
+  violin: 'violin', erhu: 'fiddle', ghaita: 'shanai', harmonica: 'harmonica', bansuri: 'flute', shakuhachi: 'shakuhachi', ney: 'panflute',
+  panflute: 'panflute', whistle: 'recorder', suling: 'ocarina', choir: 'choir', kora: 'harp', harp: 'harp', sitar: 'sitar', koto: 'koto',
+  guzheng: 'koto', oud: 'nylon', guitar: 'nylon', bass: 'abass', guembri: 'abass', steelpan: 'steel', balafon: 'marimba', marimba: 'marimba',
+  gamelan: 'vibes', rhodes: 'epiano', bells: 'tubular',
+};
+const SMP = {}, PBUF = {};
+// Niveaux mesurés : chaque instrument enregistré sonne aussi fort que l'ancienne voix de synthèse qu'il remplace.
+const SMP_GAIN = {"violin": 3.2, "bass": 1.9, "marimba": 1.15, "bells": 2.77, "choir": 0.69, "balafon": 1.07, "kora": 2.31, "sitar": 0.75, "bansuri": 1.64, "koto": 1.9, "shakuhachi": 1.33, "oud": 2.13, "ney": 1.91, "steelpan": 2.06, "guitar": 2.29, "panflute": 2.04, "guzheng": 1.84, "erhu": 3.2, "gamelan": 1.66, "suling": 1.7, "harp": 2.33, "whistle": 1.51, "rhodes": 1.21, "harmonica": 3.2, "guembri": 2.1, "ghaita": 3.2};
+const PERC_GAIN = {"drums:kick": 1.99, "drums:snare": 0.7, "congas:lo": 0.89, "congas:hi": 0.97, "congas:tap": 1.19, "djembe:B": 1.6, "djembe:T": 1.64, "djembe:S": 1.09, "tabla:D": 1.74, "tabla:N": 1.13, "tabla:T": 0.6, "taiko:D": 1.68, "taiko:K": 0.51, "darbuka:D": 1.48, "darbuka:T": 1.81, "darbuka:K": 1.11, "cajon:B": 1.64, "cajon:S": 1.09, "cajon:T": 0.45, "tanggu:D": 2.0, "tanggu:G": 1.74, "tanggu:K": 0.45, "kendang:D": 1.66, "kendang:T": 0.89, "kendang:K": 0.67, "bodhran:D": 1.25, "bodhran:T": 1.38, "bodhran:K": 0.45, "brushes:K": 1.95, "brushes:S": 1.31, "bendir:D": 1.81, "bendir:T": 0.96, "bendir:K": 0.57};
+let useSamples = true, curInst = '';
+const smpBuf = async (p) => ac.decodeAudioData(await (await fetch(new URL(`../samples/${p}`, import.meta.url))).arrayBuffer());
+export function needSamples(inst) {
+  const set = INST_SET[inst];
+  if (!set || !ac) return Promise.resolve();
+  const S = SMP[set] || (SMP[set] = { ready: false, notes: [], p: null });
+  if (!S.p) {
+    S.p = Promise.all(SAMPLE_SETS[set].notes.map(async (m) => { try { S.notes.push({ f: mtof(m), buf: await smpBuf(`${set}/${m}.mp3`) }); } catch { /* note absente */ } }))
+      .then(() => { S.notes.sort((a, b) => a.f - b.f); S.ready = S.notes.length > 0; });
+  }
+  return S.p;
+}
+// Au démarrage : les percussions, puis tous les jeux l'un après l'autre en tâche de fond, le pays en cours d'abord.
+async function loadAllSamples() {
+  await Promise.all(PERC_FILES.map(async (k) => { try { PBUF[k] = await smpBuf(`perc/${k}.mp3`); } catch { /* frappe absente */ } }));
+  const first = (PRESETS[settings.preset]?.insts || []);
+  for (const inst of [...first, ...Object.keys(INST_SET)]) await needSamples(inst);
+}
+const smpFor = () => { const S = useSamples && SMP[INST_SET[curInst]]; return S && S.ready ? S : null; };
+function nearest(S, f) { let b = S.notes[0], bd = 99; for (const n of S.notes) { const d = Math.abs(Math.log2(f / n.f)); if (d < bd) { bd = d; b = n; } } return b; }
+// Une note qui sonne puis s'éteint d'elle-même (cordes pincées, lames, cloches). hold : durée avant l'étouffoir.
+function shot(t, f, vol, dest, hold) {
+  const S = smpFor();
+  if (!S) return false;
+  const n = nearest(S, f), src = ac.createBufferSource(), g = ac.createGain();
+  src.buffer = n.buf; src.playbackRate.value = f / n.f;
+  g.gain.setValueAtTime(vol * (SMP_GAIN[curInst] ?? 1), t);
+  if (hold) g.gain.setTargetAtTime(0, t + hold, 0.1);
+  src.connect(g); g.connect(dest); src.start(t);
+  if (hold) src.stop(t + hold + 0.8);
+  return true;
+}
+// Une note tenue (archet, souffle) : elle dure tant qu'on la prolonge, glisse vers la suivante par un fondu, et
+// repart d'elle-même si on la tient plus longtemps que l'enregistrement.
+function susSample(c, t, f, vol, len) {
+  const S = smpFor();
+  if (!S) return false;
+  const kind = `smp:${INST_SET[curInst]}`, gn = SMP_GAIN[curInst] ?? 1;
+  let v = c.viol;
+  if (!v || v.kind !== kind) {
+    if (v) { v.g.gain.cancelScheduledValues(t); v.g.gain.setTargetAtTime(0, t, 0.05); v.nodes.forEach((n) => { try { n.stop(t + 1); } catch { /* déjà arrêté */ } }); v.cur?.src.stop(t + 1); }
+    v = c.viol = { kind, g: gain(1, c.in), cur: null, end: -1, f: 0, at: 0, nodes: [] };
+  }
+  const legato = !!v.cur && t < v.end + 0.03;
+  if (legato && Math.abs(Math.log2(f / v.f)) < 0.004 && t - v.at < v.dur * 0.65) {      // même note : on la prolonge
+    const p = v.cur.g.gain;
+    p.cancelScheduledValues(t); p.setTargetAtTime(vol * gn, t, 0.05); p.setTargetAtTime(0, t + len, 0.09);
+  } else {
+    if (v.cur) { const o = v.cur; o.g.gain.cancelScheduledValues(t); o.g.gain.setTargetAtTime(0, t, legato ? 0.035 : 0.06); try { o.src.stop(t + 0.6); } catch { /* déjà arrêté */ } }
+    const n = nearest(S, f), src = ac.createBufferSource(), g = ac.createGain(), rate = f / n.f;
+    src.buffer = n.buf; src.playbackRate.value = rate;
+    g.gain.setValueAtTime(0, t); g.gain.setTargetAtTime(vol * gn, t, legato ? 0.03 : 0.012); g.gain.setTargetAtTime(0, t + len, 0.09);
+    src.connect(g); g.connect(v.g); src.start(t, legato ? 0.07 : 0);      // en liant, on saute l'attaque de la note suivante
+    v.cur = { src, g }; v.f = f; v.at = t; v.dur = n.buf.duration / rate;
+  }
+  v.end = t + len;
+  return true;
+}
+// Percussions : chaque frappe = un ou deux vrais coups enregistrés. [fichier, vitesse de lecture, niveau, départ du
+// glissé (la peau grave du tabla, le petit gong), durée avant étouffement].
+const PERC_MAP = {
+  drums: { kick: [['bdrum', 1.45, 1, 0, 0.22]], snare: [['snare', 1, 0.9]], crash: [['crash', 1, 0.6]] },
+  brushes: { K: [['bdrum', 1.35, 0.7, 0, 0.2]], S: [['snaretap', 1, 0.6]] },
+  congas: { lo: [['tumba', 1, 1]], hi: [['conga', 1, 0.9]], tap: [['congatap', 1, 0.6]] },
+  djembe: { B: [['tumba', 0.82, 1]], T: [['conga', 1.12, 0.8]], S: [['quintotap', 1.35, 0.9]] },
+  tabla: { G: [['tumba', 0.78, 0.9, 0.8]], N: [['quinto', 1.9, 0.6]], T: [['quintotap', 2.2, 0.5]], D: [['tumba', 0.78, 0.9, 0.8], ['quinto', 1.9, 0.5]] },
+  taiko: { D: [['taiko36', 1, 1], ['bdrum', 1.2, 0.5, 0, 0.5]], K: [['loghi', 1.25, 0.6]] },
+  darbuka: { D: [['conga', 0.95, 1]], T: [['quintotap', 1.8, 0.8]], K: [['quintotap', 2.4, 0.45]] },
+  cajon: { B: [['tumba', 0.6, 1]], S: [['snaretap', 0.9, 0.8]], T: [['congatap', 1.1, 0.5]] },
+  tanggu: { D: [['bdrum', 1.6, 1, 0, 0.4]], K: [['loghi', 1.4, 0.6]], G: [['gong', 1.5, 0.5, 0.88, 1.2]] },
+  kendang: { D: [['tumba', 0.92, 1]], T: [['quinto', 1.2, 0.7]], K: [['congatap', 1.5, 0.5]] },
+  bodhran: { D: [['tumba', 0.55, 1]], T: [['tumbatap', 0.8, 0.7]], K: [['loghi', 1.7, 0.35]] },
+  bendir: { D: [['bdrum', 1.7, 1, 0, 0.35], ['tamb', 0.8, 0.18]], T: [['conga', 0.9, 0.7]], K: [['tamb', 1.25, 0.4]] },
+};
+let rr = 0;
+function percHit(key, t, vol, dest) {
+  const M = useSamples && PERC_MAP[curInst]?.[key];
+  if (!M || !PBUF[M[0][0]]) return false;
+  for (const [file, rate, lvl, from, cut] of M) {
+    const buf = (rr++ % 2 && PBUF[`${file}2`]) || PBUF[file];
+    if (!buf) continue;
+    const src = ac.createBufferSource(), g = ac.createGain();
+    src.buffer = buf;
+    if (from) { src.playbackRate.setValueAtTime(rate * from, t); src.playbackRate.exponentialRampToValueAtTime(rate, t + 0.13); } else src.playbackRate.value = rate;
+    g.gain.setValueAtTime(vol * lvl * (PERC_GAIN[`${curInst}:${key}`] ?? 1), t);
+    if (cut) g.gain.setTargetAtTime(0, t + cut * 0.5, cut * 0.35);
+    src.connect(g); g.connect(dest); src.start(t);
+  }
+  return true;
+}
+
 // Le piano de Genève : de vraies notes, isolées de l'enregistrement « Paris » fourni par Pascal (samples/). Chaque
 // note jouée part de l'échantillon le plus proche, transposé. Tant que les fichiers ne sont pas chargés (ou s'ils
 // manquent), le piano de synthèse prend le relais.
@@ -242,10 +354,12 @@ function pianoNote(t, f, vol, dest, long = 0.45) {
   noise({ t, vol: vol * 0.1, dest, type: 'bandpass', f: Math.min(7000, f * 5), q: 1, r: 0.008 });
 }
 function bassNote(t, f, vol, dest, dur) {
+  if (shot(t, f, vol, dest, Math.max(0.25, dur))) return;
   voice({ type: 'sawtooth', f, t, dur, vol: vol * 0.55, dest, a: 0.004, r: 0.06, cutoff: f * 7, cutTo: f * 1.8, cutT: 0.18 });
   voice({ f, t, dur, vol: vol * 0.7, dest, a: 0.004, r: 0.07 });
 }
 function choirChord(t, freqs, vol, dest, dur, a) {
+  if (smpFor()) { for (const f of freqs) shot(t, f, vol * 0.5, dest, dur); return; }
   for (const f of freqs) {
     for (const det of [-9, 8]) voice({ type: 'sawtooth', f, t, dur, vol: vol * 0.16, dest, a, r: 0.22, cutoff: 1500, det });
     voice({ f: f * 2, t, dur, vol: vol * 0.05, dest, a, r: 0.22 });
@@ -272,6 +386,7 @@ function makeViolin(c, kind = 'violin') {
   return { kind, o, g, P, end: -1, nodes: [lfo, ...o] };
 }
 function violinNote(c, t, f, vol, len, kind = 'violin') {
+  if (susSample(c, t, f, vol, len)) return;
   const v = c.viol && c.viol.kind === kind ? c.viol : (c.viol = makeViolin(c, kind)), P = v.P, legato = t < v.end + 0.03;
   v.o.forEach((o) => { if (legato) o.frequency.setTargetAtTime(f, t, P.glide); else o.frequency.setValueAtTime(f, t); });
   v.g.gain.cancelScheduledValues(t);
@@ -389,14 +504,14 @@ const INST = {
     label: 'Congas', level: 1.25, rev: 0.12, dly: 0, perc: true,
     play(x) {
       const { t, s16, e, d } = x, hi = note(x, x.r + 2, 12), lo = note(x, x.r, 12);
-      if (x.climax) { if (x.uni < 0) return false; drum(t, x.uni % 2 ? hi : lo, 0.5, d, 0.1); return true; }
+      if (x.climax) { if (x.uni < 0) return false; if (!percHit(x.uni % 2 ? 'hi' : 'lo', t, 0.9, d)) drum(t, x.uni % 2 ? hi : lo, 0.5, d, 0.1); return true; }
       const k = Math.round(1 + e * 4 + x.lvl * 2.5);
       let p = false;
-      if (euclid(k, s16, 0)) { drum(t, hi, 0.3 + 0.2 * e, d, 0.09); p = true; }
-      if (euclid(Math.round(k / 2), s16, 5)) { drum(t, lo, 0.35 + 0.2 * e, d, 0.12); p = true; }
+      if (euclid(k, s16, 0)) { if (!percHit(s16 % 4 === 2 ? 'tap' : 'hi', t, 0.6 + 0.4 * e, d)) drum(t, hi, 0.3 + 0.2 * e, d, 0.09); p = true; }
+      if (euclid(Math.round(k / 2), s16, 5)) { if (!percHit('lo', t, 0.65 + 0.35 * e, d)) drum(t, lo, 0.35 + 0.2 * e, d, 0.12); p = true; }
       return p;
     },
-    accent(x) { for (let i = 0; i < 6; i++) drum(x.t + i * x.sd / 2, note(x, x.r + (i % 3) * 2, 12), 0.35 + i * 0.05, x.d, 0.09); },
+    accent(x) { for (let i = 0; i < 6; i++) { const tt = x.t + i * x.sd / 2; if (!percHit(['lo', 'hi', 'tap'][i % 3], tt, 0.6 + i * 0.08, x.d)) drum(tt, note(x, x.r + (i % 3) * 2, 12), 0.35 + i * 0.05, x.d, 0.09); } },
   },
   choir: {
     label: 'Chœur', level: 1.3, rev: 0.6, dly: 0,
@@ -416,6 +531,7 @@ const INST = {
 // ---------- Instruments du monde (toujours synthétisés, aucun sample) ----------
 // Corde pincée : kora, koto, oud. bright = brillance de l'attaque, decay = tenue, from = note d'où l'on glisse.
 function pluck(t, f, vol, dest, { bright = 6, decay = 0.4, det = 4, body = 0.5, from } = {}) {
+  if (shot(t, f, vol, dest)) return;
   const d = decay * clamp(330 / f, 0.5, 1.6) ** 0.5, fFrom = from ? f * from : undefined;
   for (const dc of [-det, det]) {
     voice({ type: 'sawtooth', f, fFrom, glide: 0.07, t, dur: 0.012, vol: vol * 0.3, dest, a: 0.002, r: d, cutoff: f * bright, cutTo: f * 1.5, cutT: d * 0.6, det: dc });
@@ -425,6 +541,7 @@ function pluck(t, f, vol, dest, { bright = 6, decay = 0.4, det = 4, body = 0.5, 
 }
 // Sitar : corde pincée dont le chevalet « frise » (une résonance qui descend le long de la note), léger glissé d'attaque.
 function sitarNote(t, f, vol, dest, long = 0.7) {
+  if (shot(t, f, vol, dest)) return;
   const o = ac.createOscillator(); o.type = 'sawtooth';
   o.frequency.setValueAtTime(f * 0.965, t); o.frequency.exponentialRampToValueAtTime(f, t + 0.09);
   const bp = biquad('bandpass', f * 9, 5), lp = biquad('lowpass', f * 3.5), g = ac.createGain(), gb = ac.createGain();
@@ -436,11 +553,13 @@ function sitarNote(t, f, vol, dest, long = 0.7) {
   noise({ t, vol: vol * 0.15, dest, type: 'bandpass', f: Math.min(9000, f * 7), q: 2, r: 0.005 });
 }
 const steelNote = (t, f, vol, dest, long = 0.3) => {      // steel pan : fondamentale, octave et douzième qui s'éteignent vite
+  if (shot(t, f, vol, dest)) return;
   voice({ f, fFrom: f * 1.012, glide: 0.05, t, dur: 0.01, vol, dest, a: 0.002, r: long });
   voice({ f: f * 2, t, dur: 0.01, vol: vol * 0.42, dest, a: 0.002, r: long * 0.6 });
   voice({ f: f * 3.01, t, dur: 0.006, vol: vol * 0.14, dest, a: 0.001, r: long * 0.3 });
 };
 const balafonNote = (t, f, vol, dest) => {                // lame de bois + calebasse qui grésille
+  if (shot(t, f, vol, dest)) return;
   voice({ f, t, dur: 0.008, vol, dest, a: 0.001, r: 0.085 });
   voice({ f: f * 3.9, t, dur: 0.004, vol: vol * 0.2, dest, a: 0.001, r: 0.02 });
   noise({ t, vol: vol * 0.16, dest, type: 'bandpass', f: Math.min(6000, f * 3), q: 5, r: 0.03 });
@@ -466,6 +585,7 @@ function makeWind(c, kind) {
   return { kind, o, o2, bp, g, P, end: -1, nodes: [lfo, src, o2, ...o] };
 }
 function windNote(c, t, f, vol, len, kind) {
+  if (susSample(c, t, f, vol, len)) return;
   const v = c.viol && c.viol.kind === kind ? c.viol : (c.viol = makeWind(c, kind)), P = v.P, legato = t < v.end + 0.03;
   const set = (p, val) => {
     p.cancelScheduledValues(t);
@@ -482,7 +602,8 @@ const tap = (t, vol, dest, f = 3000, q = 1.2, r = 0.012) => noise({ t, vol, dest
 
 // Percussion à la main : un motif de 16 pas par niveau de vitesse. Majuscule = frappe sûre, minuscule = frappe
 // légère qui n'arrive que si l'on bouge assez. u = les deux frappes de l'unisson, g = frappe fantôme.
-function perc(label, level, pats, strokes) {
+function perc(label, level, pats, raw) {
+  const strokes = Object.fromEntries(Object.entries(raw).map(([k, fn]) => [k, (x, v) => { if (!percHit(k, x.t, v, x.d)) fn(x, v); }]));
   return {
     label, level, rev: 0.14, dly: 0, perc: true, strokes, pats,
     play(x) {
@@ -605,6 +726,7 @@ Object.assign(INST, {
     S: (x, v) => { noise({ t: x.t, vol: 0.34 * v, dest: x.d, type: 'bandpass', f: 3600, q: 0.6, a: 0.012, r: 0.11 }); tap(x.t, 0.25 * v, x.d, 1700, 1.5, 0.02); },   // balai sur la caisse claire
   }),
   rhodes: mel('Piano électrique', 0.9, 0.3, 0.12, 24, (x, f, v) => {
+    if (shot(x.t, f, 0.5 * v, x.d)) return;
     voice({ f, t: x.t, dur: 0.03, vol: 0.5 * v, dest: x.d, a: 0.004, r: 0.9 });
     voice({ type: 'triangle', f, t: x.t, dur: 0.02, vol: 0.16 * v, dest: x.d, a: 0.004, r: 0.5, det: 6 });
     voice({ f: f * 4, t: x.t, dur: 0.004, vol: 0.13 * v, dest: x.d, a: 0.001, r: 0.09 });                                                 // la lame
@@ -693,10 +815,12 @@ function scheduleStep(s, t) {
     };
     if (pulse && q.gh) x.pd = Math.round(q.gh[q.gspeed[0] > q.gspeed[1] ? 0 : 1] * (2 * n - 1));      // la main la plus active choisit la note
     let played;
+    curInst = c.inst;
     if (c.accent) {
       c.accent = false; def.accent(x); played = true;
       queue.push({ t, accent: 1, x: (S[i].x + S[i].w / 2) / GW, y: (S[i].y + S[i].h / 2) / GH });
     } else played = def.play(x);
+    curInst = '';
     if (played) { queue.push({ t, sec: i }); state.music.sounds = (state.music.sounds || 0) + 1; }
   }
 }
@@ -722,8 +846,10 @@ function swapInst(c, s, now) {
     const v = c.viol; c.viol = null;
     v.g.gain.cancelScheduledValues(now); v.g.gain.setTargetAtTime(0, now, 0.08);
     v.nodes.forEach((n) => { try { n.stop(now + 1); } catch { /* déjà arrêté */ } });
+    try { v.cur?.src.stop(now + 1); } catch { /* déjà arrêté */ }
   }
   c.inst = INST[s.inst] ? s.inst : 'piano'; c.pos = 0; c.accent = false;
+  needSamples(c.inst);
 }
 
 // ---------- Jeu par gestes : chaque geste joue un son, rejouable à l'identique ----------
@@ -756,6 +882,7 @@ function gStroke(c, id, def, lv, v, t) {      // lv : 0 grave, 1 médium, 2 clai
   const d = c.in, { iv, base } = scaleInfo();
   if (id === 'drums') { if (lv === 0) kick(t, 0.95 * v, d, false); else if (lv === 1) snare(t, 0.55 * v, d); else hat(t, 0.3 * v, d, true); }
   else if (id === 'congas') {
+    if (percHit(['lo', 'hi', 'tap'][lv], t, v, d)) return;
     if (lv === 0) drum(t, mtof(deg2midi(0, base + 12, iv)), 0.6 * v, d, 0.13);
     else if (lv === 1) drum(t, mtof(deg2midi(2, base + 12, iv)), 0.55 * v, d, 0.09);
     else tap(t, 0.6 * v, d, 2600, 0.9, 0.02);
@@ -789,7 +916,7 @@ function playGesture(i, c, s, def, e, now) {
   } else if (e.type === 'frapper') T(deg, v, sus ? 0.7 : 0.5, t);
   else if (e.type === 'ouvrir') { if (sus) T(deg + n, 1, 1.2, t); else [0, 2, 4, n].forEach((k, j) => T(deg + k, 0.6 + 0.1 * j, 0.9, t + j * 0.035)); }
   else if (e.type === 'refermer') {
-    if (sus && c.viol) { c.viol.g.gain.cancelScheduledValues(t); c.viol.g.gain.setTargetAtTime(0, t, 0.02); c.viol.end = -1; }
+    if (sus && c.viol) { const gg = (c.viol.cur ? c.viol.cur.g : c.viol.g).gain; gg.cancelScheduledValues(t); gg.setTargetAtTime(0, t, 0.02); c.viol.end = -1; }
     else { T(deg, 0.8, 0.1, t); T(deg + n, 0.6, 0.1, t + 0.07); }
   } else if (e.type === 'pousser') { if (chant) { T(deg - 1, 0.7, 0.1, t); T(deg, 1, 1, t + 0.09); } else T(-n, 1, 1.2, t); }
   // Le mouvement joue. Monter ou descendre : la mélodie suit la main, note après note (la main gauche une octave
@@ -850,7 +977,7 @@ export function update(dt) {
     if (gest) {
       c.on = !s.mute && s.present !== false && !ended;
       c.level.gain.setTargetAtTime(c.on ? def.level * s.vol : 0, now, 0.04);
-      if (c.on) { for (const g of q.gest || []) if (!settings.gestesOff.includes(g.type)) playGesture(i, c, s, def, g, now); sustainGesture(i, c, s, def, q, now); }
+      if (c.on) { curInst = c.inst; for (const g of q.gest || []) if (!settings.gestesOff.includes(g.type)) playGesture(i, c, s, def, g, now); sustainGesture(i, c, s, def, q, now); curInst = ''; }
       q.on = c.on && now - (c.gAt || -9) < 1.2;          // « joue » = un son est parti il y a moins d'une seconde
     } else {
       c.on = q.on = !s.mute && s.present !== false && !quiet && (climax || (c.on ? e > 0.07 : e > 0.12));
