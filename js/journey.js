@@ -38,7 +38,7 @@ function begin() {
   Object.assign(J, { bands: [], cur: '', t: 0, route: [...TOUR.slice(k), ...TOUR.slice(0, k)], idx: 0, maxN: 0, drops: d.drops, overflows: 0, traits: null, form: null, done: 0 });
   A = { T: 0, e: 0, open: 0, tog: 0, early: [0, 0], late: [0, 0], share: new Map(), first: new Map(), firsts: 0, await: true,
     hush0: d.hushEnds, jumps0: W.jumps, swaps0: W.swaps, startN: 0, startT: 0 };
-  if (settings.record && settings.creatureMode !== 'aucune') record.start();      // le morceau de cette session
+  if (settings.record) record.start();      // le morceau de cette session
   W.visited.clear();                     // nouvelle session : chacun repart de la place où il se tient
   slots.forEach((sl, i) => { if (sl.on && sl.pid) W.visited.set(sl.pid, new Set([i])); });
   if (settings.journey && settings.preset !== 'geneve') applyPreset('geneve');
@@ -75,7 +75,11 @@ function traits() {
   };
 }
 function finish() {
-  if (settings.creatureMode === 'aucune') { J.last = null; J.done = 0; record.cancel(); return; }      // sans créature : simple fin de session
+  if (settings.creatureMode === 'aucune') {      // sans créature : simple fin de session, le morceau garde l'heure de la session
+    const d = new Date(); J.last = null; J.done = 0;
+    record.end(`${String(d.getHours()).padStart(2, '0')}h${String(d.getMinutes()).padStart(2, '0')}`);
+    return;
+  }
   const n = ++gallery.n, now = new Date(), group = settings.mode === 'group';
   const at = `${now.getHours()} h ${String(now.getMinutes()).padStart(2, '0')}`;
   // Tout passe par le code de la créature : ce que la scène affiche est exactement ce que son lien affichera.

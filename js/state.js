@@ -65,7 +65,7 @@ export const settings = Object.assign({
   mode: 'group',      // 'crowd' (foule, secteurs fixes) ou 'group' (personnes suivies)
   zones: true,        // en 'group' : scène à trois, l'instrument dépend de la place (gauche, centre, droite)
   creature: true,     // (ancien réglage, remplacé par creatureMode)
-  creatureMode: 'fin', // 'visible' : la créature se forme pendant le jeu ; 'fin' : calculée en silence, révélée à la fin ; 'aucune'
+  creatureMode: 'aucune', // retirée de l'expérience. Anciennes valeurs : 'visible' : la créature se forme pendant le jeu ; 'fin' : calculée en silence, révélée à la fin ; 'aucune'
   record: true,       // enregistre le morceau de chaque session sur cet ordinateur
   perfShown: false,   // affichage des performances (touche P)
   preset: 'geneve',   // configuration d'instruments (voir PRESETS dans music.js)
@@ -90,7 +90,7 @@ export const settings = Object.assign({
   debug: false,
   dramaSpeed: 2,
   showSectors: true,
-}, saved, { simulate: false, simPreset: 3, simSector: -1 }, saved.rev === 7 ? {} : { hints: false, rev: 7 });   // rev 7 : consignes masquées par défaut, une fois pour toutes
+}, saved, { simulate: false, simPreset: 3, simSector: -1 }, saved.rev === 7 ? {} : { hints: false, rev: 7 }, { creatureMode: 'aucune' });      // la créature est retirée de l'expérience (décision du 17/11) : son code reste en place mais ne s'exécute plus   // rev 7 : consignes masquées par défaut, une fois pour toutes
 if (settings.mode !== 'crowd') settings.mode = 'group';
 export const trio = () => settings.mode === 'group' && settings.zones;
 // settings.sectors désigne toujours la configuration du mode actif ; celle de l'autre mode attend dans « stash ».

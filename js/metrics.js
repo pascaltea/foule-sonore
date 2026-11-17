@@ -163,9 +163,9 @@ function updateSession(dt) {
   ss.t += dt;
   ss.idle = d.attract ? ss.idle + dt : 0;
   if (ss.idle > 10) { ss.on = false; ss.t = 0; d.gauge = 0; return; }            // la scène s'est vidée
-  if (dur && ss.t >= dur) { ss.ended = 24; ss.ends++; }
+  if (dur && ss.t >= dur) { ss.ended = 12; ss.ends++; }
 }
-export function endSession() { const ss = state.session; if (ss.ended === 0 && ss.on) { ss.ended = 24; ss.ends++; } }
+export function endSession() { const ss = state.session; if (ss.ended === 0 && ss.on) { ss.ended = 12; ss.ends++; } }
 export function newSession() { const ss = state.session; ss.ended = 0; ss.on = false; ss.t = 0; state.drama.gauge = 0; state.drama.phase = 'build'; }
 
 export function updateDrama(dt) {

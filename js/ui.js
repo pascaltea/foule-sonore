@@ -62,7 +62,7 @@ function sync() {
   $('journeyOn').checked = settings.journey; document.body.classList.toggle('journey', settings.journey);
   document.querySelectorAll('[data-preset]').forEach((b) => b.classList.toggle('active', b.dataset.preset === settings.preset && !settings.custom));
   $('cfg').textContent = (PRESETS[settings.preset]?.name || '') + (settings.custom ? ' · libre' : '');
-  $('creatureMode').value = settings.creatureMode; $('recOn').checked = settings.record; $('perfOn').checked = settings.perfShown;
+  $('recOn').checked = settings.record; $('perfOn').checked = settings.perfShown;
   $('gauge').style.display = 'none'; $('perf').classList.toggle('on', settings.perfShown);
   document.querySelectorAll('[data-g]').forEach((b) => { b.dataset.c ??= b.textContent; b.textContent = group ? b.dataset.g : b.dataset.c; });
   $('showSec').checked = settings.showSectors;
@@ -196,7 +196,6 @@ export function applyConfig(cfg) {
   settings.showSectors = !!cfg.showSectors;
   if ('zones' in cfg) settings.zones = !!cfg.zones;
   if ('creature' in cfg) settings.creature = !!cfg.creature;
-  if (['visible', 'fin', 'aucune'].includes(cfg.creatureMode)) settings.creatureMode = cfg.creatureMode;
   if ('record' in cfg) settings.record = !!cfg.record;
   if (PRESETS[cfg.preset]) settings.preset = cfg.preset;
   if ('custom' in cfg) settings.custom = !!cfg.custom;
@@ -279,7 +278,7 @@ export function remoteApply(m) {
   else if (m.type === 'set' && m.key === 'scale' && SCALES[m.value]) { settings.scale = m.value; syncInputs(); sync(); }
   else if (m.type === 'set' && m.key === 'hints') { settings.hints = !!m.value; sync(); }
   else if (m.type === 'set' && m.key === 'play') { settings.play = m.value === 'gestes' ? 'gestes' : 'pulse'; syncInputs(); sync(); }
-  else if (m.type === 'set' && m.key === 'creatureMode' && ['visible', 'fin', 'aucune'].includes(m.value)) { settings.creatureMode = m.value; syncInputs(); sync(); }
+
   else if (m.type === 'set' && m.key === 'snap') { settings.snap = !!m.value; syncInputs(); sync(); }
   else if (m.type === 'set' && m.key === 'journey') { settings.journey = !!m.value; sync(); }
   else if (m.type === 'cmd' && m.name === 'next') nextStop();
@@ -319,7 +318,6 @@ export function init(h) {
   $('sessionMin').onchange = (e) => { settings.sessionMin = +e.target.value; sync(); };
   $('hintsOn').onchange = (e) => { settings.hints = e.target.checked; sync(); };
   $('playSel').onchange = (e) => { settings.play = e.target.value; sync(); };
-  $('creatureMode').onchange = (e) => { settings.creatureMode = e.target.value; sync(); };
   $('recOn').onchange = (e) => { settings.record = e.target.checked; sync(); };
   $('perfOn').onchange = (e) => { settings.perfShown = e.target.checked; sync(); };
   $('snapOn').onchange = (e) => { settings.snap = e.target.checked; sync(); };
@@ -390,7 +388,7 @@ export function init(h) {
     else if (k >= '0' && k <= '7') { settings.simPreset = +k; sync(); }
     else if (k === 'g') openRegie();
     else if (k === 'p') { settings.perfShown = !settings.perfShown; sync(); }
-    else if (k === 'm') { settings.creatureMode = { fin: 'visible', visible: 'aucune', aucune: 'fin' }[settings.creatureMode] || 'fin'; note({ fin: 'Créature : révélée à la fin', visible: 'Créature : visible pendant le jeu', aucune: 'Créature : aucune' }[settings.creatureMode], 2500); sync(); }
+
     else if (k === ' ') { e.preventDefault(); capture.simJump(); }
     else if ((k === 'delete' || k === 'backspace') && settings.debug) deleteSelected();
   });

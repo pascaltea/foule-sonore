@@ -62,8 +62,6 @@
 <label class="check"><input id="hints" type="checkbox"> Invitations à l'écran</label>
 <label>Jeu</label>
 <select id="play"><option value="gestes">Par gestes (un geste, un son)</option><option value="pulse">En pulsation (la percussion mène le tempo)</option></select>
-<label>Créature</label>
-<select id="creatureMode"><option value="fin">Révélée à la fin (le plus fluide)</option><option value="visible">Visible pendant le jeu</option><option value="aucune">Aucune</option></select>
 <label class="check"><input id="snap" type="checkbox"> Calage sur une pulsation (secours)</label>
 
 <h2>Son</h2>
@@ -117,7 +115,7 @@ function render() {
     row.querySelector('[data-f=mute]').classList.toggle('active', p.mute);
   });
   for (const k of ['volume', 'sensitivity', 'dramaSpeed', 'sessionMin', 'scale', 'key']) if (idle($(k))) $(k).value = st.set[k];
-  $('hints').checked = st.set.hints; $('journey').checked = st.set.journey; if (idle($('play'))) $('play').value = st.set.play === 'gestes' ? 'gestes' : 'pulse'; if (idle($('creatureMode'))) $('creatureMode').value = st.set.creatureMode || 'fin'; $('snap').checked = !!st.set.snap;
+  $('hints').checked = st.set.hints; $('journey').checked = st.set.journey; if (idle($('play'))) $('play').value = st.set.play === 'gestes' ? 'gestes' : 'pulse'; $('snap').checked = !!st.set.snap;
   $('vVol').textContent = Math.round(st.set.volume * 100) + ' %'; $('vSens').textContent = (+st.set.sensitivity).toFixed(2); $('vDrama').textContent = '×' + st.set.dramaSpeed;
   const t = st.session.t, dur = st.set.sessionMin * 60;
   $('time').textContent = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}` + (dur ? ` / ${st.set.sessionMin}:00` : '');
@@ -156,7 +154,6 @@ for (const k of ['sessionMin', 'key']) $(k).onchange = (e) => send({ type: 'set'
 $('scale').onchange = (e) => send({ type: 'set', key: 'scale', value: e.target.value });
 $('hints').onchange = (e) => send({ type: 'set', key: 'hints', value: e.target.checked });
 $('play').onchange = (e) => send({ type: 'set', key: 'play', value: e.target.value });
-$('creatureMode').onchange = (e) => send({ type: 'set', key: 'creatureMode', value: e.target.value });
 $('snap').onchange = (e) => send({ type: 'set', key: 'snap', value: e.target.checked });
 $('journey').onchange = (e) => send({ type: 'set', key: 'journey', value: e.target.checked });
 $('next').onclick = () => send({ type: 'cmd', name: 'next' });

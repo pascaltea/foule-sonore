@@ -136,6 +136,7 @@
   #cfg.on { opacity: .4; }
   #perf { position: fixed; left: 8px; top: 8px; z-index: 30; padding: 5px 8px; background: rgba(0,0,0,.7); color: #cfe; font: 11px/1.5 ui-monospace, Menlo, monospace; white-space: pre; pointer-events: none; display: none; }
   #perf.on { display: block; }
+  #all, #take, #gallery, .cr { display: none !important; }      /* la créature et sa galerie sont retirées de l'expérience */
   #clock { position: fixed; left: 0; bottom: 0; height: 2px; width: 0; background: rgba(255,255,255,.45); pointer-events: none; }
   #end { position: fixed; inset: 0 4vw 50vh; display: grid; place-content: center; gap: 1.2vh; text-align: center; pointer-events: none;
     opacity: 0; transition: opacity 2s; font-family: var(--title); text-transform: uppercase; }
@@ -184,15 +185,15 @@
     <div class="row"><button id="netCopy">Copier le lien</button><button id="netNew" title="Coupe l'accès de tous les téléphones déjà reliés">Nouveau code</button></div>
   </div>
   <label class="check"><input id="journeyOn" type="checkbox"> Voyage : départ et retour à Genève</label>
-  <p class="hint">Le même voyage pour tous : Genève, trois pays d'environ une minute, retour à Genève. Mains levées ensemble : Genève déborde, et laisse une veine verte sur la créature. Au final elle prend la forme de leur façon de jouer, avec un surnom et un portrait.</p>
+  <p class="hint">Le même voyage pour tous : Genève, trois pays d'environ une minute, retour à Genève. Mains levées ensemble : Genève déborde. Au final elle prend la forme de leur façon de jouer, avec un surnom et un portrait.</p>
   <label>Escale</label>
   <select id="preset"></select>
   <div class="row"><button id="nextStop">Pays suivant</button><button id="overflowBtn" title="Déclenche le débordement sans attendre le geste du trio">Genève déborde</button></div>
-  <div class="row"><button id="galExport" title="Toutes les créatures de la soirée en une image">Exporter la galerie</button><button id="galClear">Vider la galerie</button></div>
-  <div class="row"><button id="recExport" title="Un fichier son par créature, à me transmettre après la soirée">Exporter les morceaux</button></div>
-  <label class="check"><input id="galOn" type="checkbox"> Galerie en ligne, et code QR de chaque créature</label>
-  <div class="row"><button id="galLink">Copier le lien de la galerie</button><button id="galData" title="Le fichier à déposer sur le site pour garder la galerie après la soirée">Exporter les données</button></div>
-  <p class="hint"><span id="galCount"></span> <span id="galInfo"></span></p>
+  <div class="row cr"><button id="galExport" title="Toutes les créatures de la soirée en une image">Exporter la galerie</button><button id="galClear">Vider la galerie</button></div>
+  <div class="row"><button id="recExport" title="Un fichier son par session, nommé par son heure">Exporter les morceaux</button></div>
+  <label class="check cr"><input id="galOn" type="checkbox"> Galerie en ligne, et code QR de chaque créature</label>
+  <div class="row cr"><button id="galLink">Copier le lien de la galerie</button><button id="galData" title="Le fichier à déposer sur le site pour garder la galerie après la soirée">Exporter les données</button></div>
+  <p class="hint cr"><span id="galCount"></span> <span id="galInfo"></span></p>
   <div class="row">
     <div style="flex:1"><label style="margin-top:0">Durée d'une session</label><select id="sessionMin"><option value="0">Libre</option><option value="3">3 minutes</option><option value="5">5 minutes</option><option value="8">8 minutes</option><option value="10">10 minutes</option></select></div>
   </div>
@@ -245,8 +246,6 @@
   <p class="hint groupOnly">Chaque personne détectée reçoit un instrument, dans l'ordre d'arrivée, et le garde tant qu'elle reste dans le champ. Bouger joue, lever les mains monte dans l'aigu, des gestes rapides accélèrent le rythme, sauter donne un accent.</p>
   <p class="hint crowdOnly">Sur la grille debug (<kbd>D</kbd>) : glisser dans le vide pour créer un secteur, glisser un secteur pour le déplacer, ses bords pour le redimensionner, <kbd>Suppr</kbd> pour l'effacer. 6 secteurs au plus.</p>
   <label class="check"><input id="showSec" type="checkbox"> <span class="crowdOnly" style="float:none">Afficher les secteurs au public</span><span class="groupOnly" style="float:none">Afficher le cadre de chaque personne</span><span class="trioOnly" style="float:none">Afficher le repère des trois places</span></label>
-  <label>Créature (touche M)</label>
-  <select id="creatureMode"><option value="fin">Révélée à la fin (le plus fluide)</option><option value="visible">Visible pendant le jeu</option><option value="aucune">Aucune</option></select>
   <label class="check"><input id="recOn" type="checkbox"> Enregistrer le morceau de chaque session</label>
   <label class="check"><input id="perfOn" type="checkbox"> Afficher les performances (touche P)</label>
   <div class="row">

@@ -52,7 +52,7 @@ export async function exportAll() {
   } catch { return 0; }
   for (const [n, blob] of list) {
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-    a.download = `creature-${n}.${blob.type.includes('mp4') ? 'm4a' : 'webm'}`; a.click();
+    a.download = `morceau-${n}.${blob.type.includes('mp4') ? 'm4a' : 'webm'}`; a.click();
     await new Promise((r) => setTimeout(r, 400)); URL.revokeObjectURL(a.href);
   }
   return list.length;
