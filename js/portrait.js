@@ -7,6 +7,9 @@ export const COUNTRIES = {
   g: { id: 'geneve', name: 'Genève', ink: [0.03, 0.6, 0.36] }, m: { id: 'mali', name: 'Mali', ink: [1, 0.46, 0.04] },
   i: { id: 'inde', name: 'Inde', ink: [0.95, 0.36, 0.9] }, j: { id: 'japon', name: 'Japon', ink: [0.8, 0.85, 0.96] },
   l: { id: 'levant', name: 'Levant', ink: [0.04, 0.5, 0.86] }, c: { id: 'caraibes', name: 'Caraïbes', ink: [1, 0.93, 0.3] },
+  a: { id: 'amlat', name: 'Amérique latine', ink: [0.08, 0.82, 0.86] }, h: { id: 'chine', name: 'Chine', ink: [0.96, 0.15, 0.13] },
+  n: { id: 'indonesie', name: 'Indonésie', ink: [0.56, 0.36, 0.98] }, r: { id: 'irlande', name: 'Irlande', ink: [0.6, 0.88, 0.22] },
+  u: { id: 'usa', name: 'États-Unis', ink: [1, 0.45, 0.62] }, o: { id: 'maroc', name: 'Maroc', ink: [0.86, 0.7, 0.46] },
 };
 const LETTER = Object.fromEntries(Object.entries(COUNTRIES).map(([k, v]) => [v.id, k]));
 const clamp = (v, a = 0, b = 1) => (v < a ? a : v > b ? b : v);

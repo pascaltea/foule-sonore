@@ -33,7 +33,8 @@ export function render(dt, t) {
   if (!g) return;
   resize();
   g.clearRect(0, 0, W, H);
-  if (!settings.creature) return;
+  const cm = settings.creatureMode;
+  if (cm === 'aucune' || (cm === 'fin' && !(state.session.ended > 0))) return;      // rien à dessiner pendant le jeu : toute la fluidité va au son et à la brume
   const idle = !state.music.running;           // écran d'accueil : le dôme attend, à demi levé
   const d = state.drama, m = state.m, mu = state.music, J = state.journey;
   const ended = state.session.ended > 0;       // fin de session : la créature du trio, entière, dans son aura

@@ -105,13 +105,13 @@
   #start h1 { margin: 1.4vh 0 1vh; font: 400 min(10vw, 17vh)/0.9 var(--title); text-transform: uppercase; letter-spacing: .01em; color: #fff; }
   #start .tag { font-size: clamp(11px, 1.15vw, 20px); color: #fff; }
   #start h4 { margin: 3.4vh 0 1.2vh; font-size: clamp(9px, .8vw, 13px); color: var(--dim); }
-  #presetPick { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0; width: min(92vw, 1180px); border: 1px solid var(--line); }
-  #presetPick button { width: auto; padding: 1.8vh .6vw 1.6vh; border: 0; border-radius: 0; background: none; color: var(--dim); text-align: center; }
+  #presetPick { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0; row-gap: 1px; background: var(--line); width: min(92vw, 1180px); border: 1px solid var(--line); }
+  #presetPick button { width: auto; padding: 1.3vh .6vw 1.2vh; border: 0; border-radius: 0; background: #060707; color: var(--dim); text-align: center; }
   #presetPick button + button { border-left: 1px solid var(--line); }
   #presetPick b { display: block; font: 400 clamp(15px, 1.9vw, 30px)/1 var(--title); text-transform: uppercase; letter-spacing: .06em; color: #fff; }
   #presetPick i { display: block; margin: .7vh 0 1vh; font: 400 clamp(8px, .7vw, 12px)/1.2 var(--title); font-style: normal; text-transform: uppercase; letter-spacing: .26em; }
   #presetPick span { display: block; font-size: clamp(10px, .85vw, 14px); line-height: 1.5; }
-  #presetPick button:hover { background: rgba(255,255,255,.07); }
+  #presetPick button:hover { background: #161818; }
   #presetPick button.active { background: #fff; color: #333; }
   #presetPick button.active b { color: #000; }
   #how { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0 1.6vw; width: min(92vw, 1180px); margin: 0; padding: 0; list-style: none; }
@@ -134,6 +134,8 @@
   #cfg { position: fixed; left: 2.4vw; bottom: 3vh; pointer-events: none; opacity: 0; transition: opacity 1.5s;
     font: 400 clamp(9px, .85vw, 15px)/1 var(--title); text-transform: uppercase; letter-spacing: .34em; color: #fff; }
   #cfg.on { opacity: .4; }
+  #perf { position: fixed; left: 8px; top: 8px; z-index: 30; padding: 5px 8px; background: rgba(0,0,0,.7); color: #cfe; font: 11px/1.5 ui-monospace, Menlo, monospace; white-space: pre; pointer-events: none; display: none; }
+  #perf.on { display: block; }
   #clock { position: fixed; left: 0; bottom: 0; height: 2px; width: 0; background: rgba(255,255,255,.45); pointer-events: none; }
   #end { position: fixed; inset: 0 4vw 50vh; display: grid; place-content: center; gap: 1.2vh; text-align: center; pointer-events: none;
     opacity: 0; transition: opacity 2s; font-family: var(--title); text-transform: uppercase; }
@@ -196,7 +198,8 @@
   </div>
   <div class="row"><button id="sessNew">Nouvelle session</button><button id="sessEnd">Final</button></div>
   <label class="check"><input id="hintsOn" type="checkbox"> Invitations à l'écran</label>
-  <label class="check" title="Chaque geste joue un son. Décoché : l'ancienne partition guidée par le mouvement."><input id="playOn" type="checkbox"> Jeu par gestes (un geste, un son)</label>
+  <label>Jeu</label>
+  <select id="playSel"><option value="gestes">Par gestes (un geste, un son)</option><option value="pulse">En pulsation (la percussion mène le tempo)</option></select>
   <label class="check" title="Secours : chaque son attend le prochain temps d'une pulsation commune"><input id="snapOn" type="checkbox"> Calage sur une pulsation</label>
   <label>Mode</label>
   <select id="mode"><option value="trio">Scène à trois (gauche, centre, droite)</option><option value="group">Petit groupe (1 à 5 personnes suivies)</option><option value="crowd">Foule (secteurs de l'espace)</option></select>
@@ -242,7 +245,10 @@
   <p class="hint groupOnly">Chaque personne détectée reçoit un instrument, dans l'ordre d'arrivée, et le garde tant qu'elle reste dans le champ. Bouger joue, lever les mains monte dans l'aigu, des gestes rapides accélèrent le rythme, sauter donne un accent.</p>
   <p class="hint crowdOnly">Sur la grille debug (<kbd>D</kbd>) : glisser dans le vide pour créer un secteur, glisser un secteur pour le déplacer, ses bords pour le redimensionner, <kbd>Suppr</kbd> pour l'effacer. 6 secteurs au plus.</p>
   <label class="check"><input id="showSec" type="checkbox"> <span class="crowdOnly" style="float:none">Afficher les secteurs au public</span><span class="groupOnly" style="float:none">Afficher le cadre de chaque personne</span><span class="trioOnly" style="float:none">Afficher le repère des trois places</span></label>
-  <label class="check"><input id="creatureOn" type="checkbox"> Afficher le dôme (à la place de la jauge)</label>
+  <label>Créature (touche M)</label>
+  <select id="creatureMode"><option value="fin">Révélée à la fin (le plus fluide)</option><option value="visible">Visible pendant le jeu</option><option value="aucune">Aucune</option></select>
+  <label class="check"><input id="recOn" type="checkbox"> Enregistrer le morceau de chaque session</label>
+  <label class="check"><input id="perfOn" type="checkbox"> Afficher les performances (touche P)</label>
   <div class="row">
     <button id="exportCfg">Exporter</button><button id="importCfg">Importer</button>
     <input id="importFile" type="file" accept="application/json,.json" hidden>
@@ -253,6 +259,7 @@
 
 <div id="hint"></div>
 <div id="cfg"></div>
+<div id="perf"></div>
 <div id="clock"></div>
 <div id="gallery"></div>
 <div id="end"><b>Merci</b><small>Place aux suivants</small></div>
@@ -267,12 +274,12 @@
   <div id="presetPick"></div>
   <h4>Comment jouer</h4>
   <ul id="how">
-    <li><b>Bouger</b>Chaque geste joue une note. Plus vite, le rythme se resserre.</li>
-    <li><b>Lever les mains</b>Mains hautes, le son monte dans l'aigu. Mains basses, il descend.</li>
-    <li><b>Ouvrir les bras</b>Le son s'éclaircit et résonne. Bras serrés, il se feutre.</li>
+    <li><b>Bouger les bras</b>Un bras qui monte, descend ou file de côté fait sonner des notes tout au long du geste.</li>
+    <li><b>Haut, bas</b>La hauteur de la main choisit la note : en haut l'aigu, en bas le grave.</li>
+    <li><b>Ouvrir, refermer</b>Ouvrir grand les bras fait éclater un accord. Les refermer le coupe net.</li>
     <li class="trioOnly"><b>Changer de place</b>Gauche, centre, droite : trois instruments. On passe de l'un à l'autre.</li>
     <li class="groupOnly"><b>Sauter</b>Un saut donne un accent.</li>
-    <li><b>Ensemble</b>Tous les mains en l'air : Genève déborde. Tous immobiles d'un coup : silence.</li>
+    <li><b>Ensemble</b>Tous les mains en l'air : Genève déborde. Sans mouvement, aucun son.</li>
   </ul>
   <div id="go"><button id="btnStart">Démarrer avec la caméra</button><button id="btnSim">Essayer sans caméra</button></div>
   <div id="modes"><button data-mode="trio">Scène à trois</button><button data-mode="group">Petit groupe</button><button data-mode="crowd">Foule</button></div>

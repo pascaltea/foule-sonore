@@ -57,6 +57,7 @@
     <a href="index.html" target="_blank">Comparer avec la version actuelle</a>
   </div>
 
+  <p class="what" id="info" style="margin:-6px 0 14px"></p>
   <div class="grid">
     <div>
       <div class="view"><video id="v" playsinline muted></video><canvas id="sk"></canvas><div class="msg" id="msg">Activez la caméra, puis reculez pour être visible de la tête aux hanches.</div></div>
@@ -81,7 +82,7 @@
 </main>
 
 <script type="module">
-import { initLab, PRESETS, SCALES } from './js/music.js';
+import { initLab, PRESETS, SCALES, INSTRUMENTS } from './js/music.js';
 import { settings } from './js/state.js';
 import { Gestes, GESTES } from './js/gestes.js';
 
@@ -127,6 +128,8 @@ function show(e) {
   $('big').textContent = GESTES[e.type] + (TRACE[e.type] && e.two ? ' (deux bras)' : ''); $('big').classList.remove('fade'); $('what').textContent = LEGEND[e.type][role]; lastBig = performance.now();
 }
 function legend() {
+  const P = PRESETS[preset];
+  $('info').textContent = `${P.name} : ${P.insts.map((k) => INSTRUMENTS[k]).join(', ')} · gamme ${SCALES[P.scale].label}`;
   $('tab').innerHTML = Object.keys(GESTES).map((g, i) => `<tr data-g="${g}"><td><kbd>${i + 1}</kbd>${GESTES[g]}</td><td>${LEGEND[g][role]}</td><td class="n">${counts[g] || ''}</td></tr>`).join('');
 }
 function seg(el, names, get, set) {
@@ -192,7 +195,8 @@ async function start() {
   }
 }
 
-seg($('pays'), ['Genève', 'Mali', 'Inde', 'Japon', 'Levant', 'Caraïbes'], () => ['geneve', 'mali', 'inde', 'japon', 'levant', 'caraibes'].indexOf(preset), (i) => { preset = ['geneve', 'mali', 'inde', 'japon', 'levant', 'caraibes'][i]; });
+const IDS = Object.keys(PRESETS);
+seg($('pays'), IDS.map((k) => PRESETS[k].name), () => IDS.indexOf(preset), (i) => { preset = IDS[i]; });
 seg($('role'), ROLES, () => role, (i) => { role = i; });
 legend();
 $('go').onclick = start;

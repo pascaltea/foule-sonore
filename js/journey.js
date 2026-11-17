@@ -15,7 +15,7 @@ import { PLAIN, auraBreath, auraTint } from './creature-draw.js';
 import { formOf, describe, whoOf, encode, decode } from './portrait.js';
 import * as record from './record.js';
 
-const GKEY = 'foule-sonore-galerie', TOUR = ['mali', 'levant', 'inde', 'japon', 'caraibes'], MAX_ITEMS = 48, STOPS = 3;
+const GKEY = 'foule-sonore-galerie', TOUR = ['mali', 'chine', 'amlat', 'levant', 'indonesie', 'inde', 'irlande', 'japon', 'maroc', 'caraibes', 'usa'], MAX_ITEMS = 48, STOPS = 3;
 export const gallery = { n: 0, items: [], version: 0 };
 try { const g = JSON.parse(localStorage.getItem(GKEY) || '{}'); gallery.n = g.n | 0; if (Array.isArray(g.items)) gallery.items = g.items; } catch { /* stockage indisponible */ }
 function save() {
@@ -38,7 +38,7 @@ function begin() {
   Object.assign(J, { bands: [], cur: '', t: 0, route: [...TOUR.slice(k), ...TOUR.slice(0, k)], idx: 0, maxN: 0, drops: d.drops, overflows: 0, traits: null, form: null, done: 0 });
   A = { T: 0, e: 0, open: 0, tog: 0, early: [0, 0], late: [0, 0], share: new Map(), first: new Map(), firsts: 0, await: true,
     hush0: d.hushEnds, jumps0: W.jumps, swaps0: W.swaps, startN: 0, startT: 0 };
-  record.start();                        // le morceau de cette session
+  if (settings.record && settings.creatureMode !== 'aucune') record.start();      // le morceau de cette session
   W.visited.clear();                     // nouvelle session : chacun repart de la place où il se tient
   slots.forEach((sl, i) => { if (sl.on && sl.pid) W.visited.set(sl.pid, new Set([i])); });
   if (settings.journey && settings.preset !== 'geneve') applyPreset('geneve');
@@ -75,6 +75,7 @@ function traits() {
   };
 }
 function finish() {
+  if (settings.creatureMode === 'aucune') { J.last = null; J.done = 0; record.cancel(); return; }      // sans créature : simple fin de session
   const n = ++gallery.n, now = new Date(), group = settings.mode === 'group';
   const at = `${now.getHours()} h ${String(now.getMinutes()).padStart(2, '0')}`;
   // Tout passe par le code de la créature : ce que la scène affiche est exactement ce que son lien affichera.

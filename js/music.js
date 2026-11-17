@@ -12,9 +12,12 @@ export const SCALES = {
   yaman: { label: 'Yaman (Inde)', iv: [0, 2, 4, 6, 7, 9, 11] },
   hirajoshi: { label: 'Hirajoshi (Japon)', iv: [0, 2, 3, 7, 8] },
   hijaz: { label: 'Hijaz (Levant)', iv: [0, 1, 4, 5, 7, 8, 10] },
+  phrygienMaj: { label: 'Phrygien majeur (Maroc)', iv: [0, 1, 4, 5, 7, 8, 10] },
+  pelog: { label: 'Pelog (Indonésie)', iv: [0, 1, 3, 7, 8] },
+  blues: { label: 'Blues', iv: [0, 3, 5, 6, 7, 10] },
 };
 export const KEYS = ['Do', 'Do♯', 'Ré', 'Mi♭', 'Mi', 'Fa', 'Fa♯', 'Sol', 'La♭', 'La', 'Si♭', 'Si'];
-const PROG = { 5: [0, 3, 1, 4], 7: [0, 5, 3, 4] };
+const PROG = { 5: [0, 3, 1, 4], 6: [0, 2, 0, 4], 7: [0, 5, 3, 4] };
 const UNISON = [0, 3, 6, 8, 10, 12, 14];        // rythme commun à tous les instruments pendant le climax
 const UNI_DEG = [0, 2, 4, 0, 4, 2, 4];
 
@@ -23,7 +26,7 @@ const pick = (a) => a[(Math.random() * a.length) | 0];
 
 let ac = null, master, limiter, analyser, duck, revIn, dlyIn, dly, noiseBuf, pad;
 const bus = {}, chan = [];
-let bpm = 90, nextT = 0, step = 0, bar = -1, chordIdx = 0;
+let bpm = 90, pulseBpm = 90, nextT = 0, step = 0, bar = -1, chordIdx = 0;
 let lastTierUps = 0, lastSig = '', lastLift = 0, lastDrop = 0, lastHush = 0, lastEnd = 0;
 const lastPeak = new Int32Array(MAX_SECTORS);
 const queue = [];
@@ -227,22 +230,30 @@ function choirChord(t, freqs, vol, dest, dur, a) {
   }
 }
 // Violon : voix tenue par secteur (deux cordes frottées, vibrato, résonance de caisse), liée d'une note à l'autre.
-function makeViolin(c) {
-  const g = gain(0, c.in), hp = biquad('highpass', 220), pk = biquad('peaking', 2600, 1.2, 7), lp = biquad('lowpass', 4200);
+// La même voix sert aux autres cordes frottées et aux anches : erhu (glissé, vibrato large), ghaïta (hautbois nasal),
+// harmonica (anche douce). Seuls le timbre, le vibrato et l'attaque changent.
+const BOWED = {
+  violin: { type: 'sawtooth', hp: 220, pk: 2600, pkG: 7, lp: 4200, vib: 5.6, depth: 12, det: 5, glide: 0.03, att: 0.07 },
+  erhu: { type: 'sawtooth', hp: 320, pk: 1700, pkG: 10, lp: 3000, vib: 6.2, depth: 24, det: 2, glide: 0.08, att: 0.09 },
+  ghaita: { type: 'sawtooth', hp: 420, pk: 1350, pkG: 13, lp: 5200, vib: 6.6, depth: 8, det: 9, glide: 0.02, att: 0.03 },
+  harmonica: { type: 'square', hp: 300, pk: 1150, pkG: 8, lp: 2800, vib: 5, depth: 10, det: 8, glide: 0.035, att: 0.04 },
+};
+function makeViolin(c, kind = 'violin') {
+  const P = BOWED[kind], g = gain(0, c.in), hp = biquad('highpass', P.hp), pk = biquad('peaking', P.pk, 1.2, P.pkG), lp = biquad('lowpass', P.lp);
   lp.connect(pk); pk.connect(hp); hp.connect(g);
-  const lfo = ac.createOscillator(); lfo.frequency.value = 5.6;
-  const vib = gain(12); lfo.connect(vib); lfo.start();
-  const o = [-5, 5].map((det) => {
-    const osc = ac.createOscillator(); osc.type = 'sawtooth'; osc.detune.value = det;
+  const lfo = ac.createOscillator(); lfo.frequency.value = P.vib;
+  const vib = gain(P.depth); lfo.connect(vib); lfo.start();
+  const o = [-P.det, P.det].map((det) => {
+    const osc = ac.createOscillator(); osc.type = P.type; osc.detune.value = det;
     vib.connect(osc.detune); osc.connect(lp); osc.start(); return osc;
   });
-  return { kind: 'violin', o, g, end: -1, nodes: [lfo, ...o] };
+  return { kind, o, g, P, end: -1, nodes: [lfo, ...o] };
 }
-function violinNote(c, t, f, vol, len) {
-  const v = c.viol && c.viol.kind === 'violin' ? c.viol : (c.viol = makeViolin(c)), legato = t < v.end + 0.03;
-  v.o.forEach((o) => { if (legato) o.frequency.setTargetAtTime(f, t, 0.03); else o.frequency.setValueAtTime(f, t); });
+function violinNote(c, t, f, vol, len, kind = 'violin') {
+  const v = c.viol && c.viol.kind === kind ? c.viol : (c.viol = makeViolin(c, kind)), P = v.P, legato = t < v.end + 0.03;
+  v.o.forEach((o) => { if (legato) o.frequency.setTargetAtTime(f, t, P.glide); else o.frequency.setValueAtTime(f, t); });
   v.g.gain.cancelScheduledValues(t);
-  v.g.gain.setTargetAtTime(vol, t, legato ? 0.03 : 0.07);     // attaque lente de l'archet
+  v.g.gain.setTargetAtTime(vol * (P.type === 'square' ? 0.6 : 1), t, legato ? 0.03 : P.att);     // attaque lente de l'archet
   v.g.gain.setTargetAtTime(0, t + len, 0.1);
   v.end = t + len;
 }
@@ -262,6 +273,7 @@ const euclid = (k, s, rot) => k > 0 && ((s + rot) * k) % 16 < k;
 //     coh (cohérence), oct (registre -1..1), r/n/iv/base (harmonie), climax, uni (rang dans le rythme d'unisson),
 //     hit (le secteur joue une note sur ce pas), d (entrée de la tranche), c (tranche).
 function melDeg(x) {
+  if (x.pd !== undefined) return x.pd;                                      // jeu en pulsation : la hauteur de la main choisit la note
   if (x.climax) return x.r + UNI_DEG[x.uni];                               // unisson : tout le monde la même note
   if (Math.random() < 0.15 + 0.85 * x.coh) return x.r + [0, 2, 4, x.n, 4, 2, x.n + 2, 4][x.c.pos++ % 8];   // phrase ordonnée
   return x.r + ((Math.random() * (x.n + 3)) | 0);                          // notes éparses
@@ -324,8 +336,9 @@ const INST = {
       const { s16, lvl } = x;
       const on = x.climax ? x.uni >= 0 : (lvl === 0 ? [0, 8] : lvl === 1 ? [0, 6, 8, 14] : [0, 3, 6, 8, 11, 14]).includes(s16);
       if (!on) return false;
-      let dg = x.r - x.n;
+      let dg = (x.pd ?? x.r) - x.n;                // pulsation : la main choisit la note de basse
       if (x.climax) dg += UNI_DEG[x.uni];
+      else if (x.pd !== undefined) dg += 0;
       else if (s16 % 8) dg += Math.random() < x.coh ? (s16 === 14 ? 4 : 2) : pick([0, 2, 4, x.n - 1]);
       bassNote(x.t, mtof(deg2midi(dg, x.base + 12 + (x.oct > 0 ? 12 : 0), x.iv)), 0.7, x.d, stepsLen(x) * 0.7);
       return true;
@@ -415,6 +428,9 @@ const WIND = {
   bansuri: { breath: 0.05, vib: 5.2, depth: 7, glide: 0.05, lp: 3200, scoop: 0.985 },
   shakuhachi: { breath: 0.17, vib: 4.2, depth: 15, glide: 0.09, lp: 2400, scoop: 0.93 },
   ney: { breath: 0.12, vib: 4.8, depth: 10, glide: 0.06, lp: 2700, scoop: 0.97 },
+  panflute: { breath: 0.24, vib: 4.6, depth: 6, glide: 0.03, lp: 2500, scoop: 0.96 },
+  suling: { breath: 0.1, vib: 6.2, depth: 11, glide: 0.045, lp: 3600, scoop: 0.975 },
+  whistle: { breath: 0.07, vib: 5.6, depth: 5, glide: 0.022, lp: 4400, scoop: 0.99 },
 };
 function makeWind(c, kind) {
   const P = WIND[kind], g = gain(0, c.in), lp = biquad('lowpass', P.lp);
@@ -516,6 +532,72 @@ Object.assign(INST, {
     steelNote(x.t, f, 0.42 * v, x.d);
     if (x.lvl === 0 && !x.climax) steelNote(x.t + x.sd, f, 0.26 * v, x.d);                                                              // roulement
   }),
+  // ----- Amérique latine (Andes) -----
+  cajon: perc('Cajón', 1.3, { 0: 'B...S...B.b.S...', 1: 'B.tSB.tSB.bSt.S.', 2: 'B.tSBtbSBtbStSSt', u: 'BS', g: 'T' }, {
+    B: (x, v) => { drum(x.t, 82, 0.9 * v, x.d, 0.12); thump(x.t, 82, 0.6 * v, x.d, 0.12, 1000); },
+    S: (x, v) => { tap(x.t, 0.7 * v, x.d, 2100, 0.8, 0.03); noise({ t: x.t, vol: 0.2 * v, dest: x.d, type: 'highpass', f: 5000, r: 0.04 }); },
+    T: (x, v) => tap(x.t, 0.35 * v, x.d, 1500, 2, 0.012),
+  }),
+  guitar: mel('Guitare', 0.8, 0.22, 0.1, 12, (x, f, v) => pluck(x.t, f, 0.55 * v, x.d, { bright: 5, decay: 0.6, det: 3, body: 0.75 }), {
+    under: (x) => { if (x.s16 % 8 === 0 && !x.climax) pluck(x.t, note(x, x.r - x.n, 12), 0.45, x.d, { bright: 4, decay: 0.7, body: 0.85 }); },   // basse du pouce
+    accent: (x) => { [0, 2, 4, x.n, x.n + 2].forEach((dg, i) => pluck(x.t + i * 0.022, note(x, x.r + dg, 12), 0.45, x.d, { bright: 6, decay: 0.7, body: 0.7 })); },   // rasgueo
+  }),
+  panflute: mel('Flûte de pan', 0.85, 0.45, 0.12, 24, (x, f, v) => windNote(x.c, x.t, f, 0.32 * v, stepsLen(x) * 1.3, 'panflute')),
+  // ----- Chine -----
+  tanggu: perc('Tanggu', 1.2, { 0: 'D.......D...g...', 1: 'D...k.k.D.k.g...', 2: 'D.k.D.kkD.k.gkDk', u: 'DG', g: 'K' }, {
+    D: (x, v) => { voice({ f: 92, fFrom: 150, glide: 0.06, t: x.t, dur: 0.03, vol: v, dest: x.d, a: 0.002, r: 0.22 }); thump(x.t, 92, 0.9 * v, x.d, 0.22, 1700); },
+    K: (x, v) => { tap(x.t, 0.7 * v, x.d, 2700, 3, 0.011); voice({ f: 1050, t: x.t, dur: 0.003, vol: 0.25 * v, dest: x.d, r: 0.016 }); },
+    // petit gong d'opéra : son qui monte
+    G: (x, v) => { voice({ f: 620, fFrom: 470, glide: 0.18, t: x.t, dur: 0.02, vol: 0.4 * v, dest: x.d, a: 0.002, r: 0.5 }); voice({ f: 1490, fFrom: 1130, glide: 0.18, t: x.t, dur: 0.01, vol: 0.14 * v, dest: x.d, r: 0.3 }); tap(x.t, 0.3 * v, x.d, 3400, 1, 0.03); },
+  }),
+  guzheng: mel('Guzheng', 0.8, 0.35, 0.22, 24, (x, f, v) => {
+    pluck(x.t, f, 0.5 * v, x.d, { bright: 12, decay: 0.85, det: 3, body: 0.3, from: Math.random() < 0.3 ? 0.944 : undefined });
+    pluck(x.t + 0.012, f * 2, 0.14 * v, x.d, { bright: 9, decay: 0.5, det: 2, body: 0.2 });                                             // l'octave qui scintille
+  }, { accent: (x) => { for (let i = 0; i < 10; i++) pluck(x.t + i * x.sd / 5, note(x, x.r + x.n + 4 - i, 24), 0.34, x.d, { bright: 12, decay: 0.6, body: 0.3 }); } }),   // cascade
+  erhu: mel('Erhu', 0.8, 0.4, 0.1, 24, (x, f, v) => violinNote(x.c, x.t, f, 0.26 * v, stepsLen(x) * 1.5, 'erhu')),
+  // ----- Indonésie (gamelan) -----
+  kendang: perc('Kendang', 1.3, { 0: 'D...T...D.t.T...', 1: 'D.tTD.T.DtT.t.T.', 2: 'DtTkDtTkD.TkTtTk', u: 'DT', g: 'K' }, {
+    D: (x, v) => { voice({ f: 105, fFrom: 160, glide: 0.05, t: x.t, dur: 0.02, vol: 0.85 * v, dest: x.d, a: 0.002, r: 0.14 }); thump(x.t, 105, 0.6 * v, x.d, 0.14, 1300); },
+    T: (x, v) => drum(x.t, 290, 0.5 * v, x.d, 0.06),
+    K: (x, v) => tap(x.t, 0.45 * v, x.d, 3000, 2.2, 0.01),
+  }),
+  // métallophones accordés par paires légèrement décalées : le battement du gamelan
+  gamelan: mel('Gamelan', 0.8, 0.4, 0.2, 24, (x, f, v) => { bellNote(x.t, f, 0.3 * v, x.d, 0.7); bellNote(x.t, f * 1.011, 0.22 * v, x.d, 0.7); }, {
+    under: (x) => { if (x.s16 === 0 && !x.climax) { const f = note(x, x.r - x.n, 12); voice({ f, t: x.t, dur: 0.05, vol: 0.5, dest: x.d, a: 0.004, r: 1.6 }); voice({ f: f * 1.008, t: x.t, dur: 0.05, vol: 0.35, dest: x.d, a: 0.004, r: 1.6 }); } },   // gong
+  }),
+  suling: mel('Suling (flûte)', 0.8, 0.5, 0.14, 36, (x, f, v) => windNote(x.c, x.t, f, 0.28 * v, stepsLen(x) * 1.5, 'suling')),
+  // ----- Irlande -----
+  bodhran: perc('Bodhrán', 1.3, { 0: 'D..t..D..t..D.t.', 1: 'D.tD.tD.tD.tD.tt', 2: 'DttDttDttDttDtDt', u: 'DT', g: 'K' }, {
+    D: (x, v) => { drum(x.t, 88, 0.85 * v, x.d, 0.1); thump(x.t, 88, 0.5 * v, x.d, 0.1, 900); },
+    T: (x, v) => drum(x.t, 150, 0.5 * v, x.d, 0.06),
+    K: (x, v) => tap(x.t, 0.4 * v, x.d, 1800, 2.5, 0.008),
+  }),
+  harp: mel('Harpe', 0.8, 0.4, 0.2, 24, (x, f, v) => pluck(x.t, f, 0.5 * v, x.d, { bright: 7, decay: 0.95, det: 2, body: 0.65 }), {
+    under: (x) => { if (x.s16 % 8 === 0 && !x.climax) pluck(x.t, note(x, x.r - x.n, 24), 0.4, x.d, { bright: 5, decay: 1, body: 0.8 }); },
+    accent: (x) => { for (let i = 0; i < 9; i++) pluck(x.t + i * x.sd / 4, note(x, x.r + i, 24), 0.38, x.d, { bright: 7, decay: 0.8, body: 0.6 }); },   // glissando
+  }),
+  whistle: mel('Tin whistle', 0.7, 0.4, 0.12, 36, (x, f, v) => windNote(x.c, x.t, f, 0.26 * v, stepsLen(x) * 1.1, 'whistle')),
+  // ----- États-Unis (blues) -----
+  brushes: perc('Batterie aux balais', 1.1, { 0: 'K...S...K.k.S...', 1: 'K..sS..sK.ksS..s', 2: 'K.ssS.ssK.ksS.ss', u: 'KS', g: 'S' }, {
+    K: (x, v) => kick(x.t, 0.7 * v, x.d, false),
+    S: (x, v) => { noise({ t: x.t, vol: 0.34 * v, dest: x.d, type: 'bandpass', f: 3600, q: 0.6, a: 0.012, r: 0.11 }); tap(x.t, 0.25 * v, x.d, 1700, 1.5, 0.02); },   // balai sur la caisse claire
+  }),
+  rhodes: mel('Piano électrique', 0.9, 0.3, 0.12, 24, (x, f, v) => {
+    voice({ f, t: x.t, dur: 0.03, vol: 0.5 * v, dest: x.d, a: 0.004, r: 0.9 });
+    voice({ type: 'triangle', f, t: x.t, dur: 0.02, vol: 0.16 * v, dest: x.d, a: 0.004, r: 0.5, det: 6 });
+    voice({ f: f * 4, t: x.t, dur: 0.004, vol: 0.13 * v, dest: x.d, a: 0.001, r: 0.09 });                                                 // la lame
+  }, { under: (x) => { if (x.s16 === 0 && !x.climax) bassNote(x.t, note(x, x.r - x.n, 12), 0.5, x.d, x.sd * 3); } }),
+  harmonica: mel('Harmonica', 0.75, 0.3, 0.12, 24, (x, f, v) => violinNote(x.c, x.t, f, 0.3 * v, stepsLen(x) * 1.3, 'harmonica')),
+  // ----- Maroc -----
+  bendir: perc('Bendir et qraqeb', 1.4, { 0: 'D..k..T.D..k..T.', 1: 'D.kk.kT.D.kk.kTk', 2: 'DkkkTkkkDkkkTkTk', u: 'DT', g: 'K' }, {
+    // peau large avec ses cordes de timbre qui grésillent
+    D: (x, v) => { drum(x.t, 74, 0.9 * v, x.d, 0.16); thump(x.t, 74, 0.6 * v, x.d, 0.16, 1100); noise({ t: x.t, vol: 0.16 * v, dest: x.d, type: 'bandpass', f: 1900, q: 3, r: 0.09 }); },
+    T: (x, v) => { drum(x.t, 190, 0.5 * v, x.d, 0.07); noise({ t: x.t, vol: 0.1 * v, dest: x.d, type: 'bandpass', f: 2400, q: 3, r: 0.05 }); },
+    // qraqeb : castagnettes de métal
+    K: (x, v) => { tap(x.t, 0.4 * v, x.d, 5200, 3, 0.016); voice({ f: 3100, t: x.t, dur: 0.003, vol: 0.1 * v, dest: x.d, r: 0.02 }); },
+  }),
+  guembri: mel('Guembri', 0.9, 0.15, 0.05, 0, (x, f, v) => { pluck(x.t, f, 0.7 * v, x.d, { bright: 3.2, decay: 0.42, det: 4, body: 0.95 }); tap(x.t, 0.22 * v, x.d, 900, 1.5, 0.012); }),   // luth basse à peau, le doigt claque sur la table
+  ghaita: mel('Ghaïta', 0.5, 0.35, 0.1, 24, (x, f, v) => violinNote(x.c, x.t, f, 0.26 * v, stepsLen(x) * 1.2, 'ghaita')),
 });
 
 // Configurations : des trios pensés pour sonner ensemble dès la première note (rythme à gauche, harmonie au centre,
@@ -527,6 +609,12 @@ export const PRESETS = {
   japon: { name: 'Japon', sub: 'gamme hirajoshi', insts: ['taiko', 'koto', 'shakuhachi'], scale: 'hirajoshi', key: 2, bpm: [60, 110], prog: [0, 0, 3, 0], ink: [0.8, 0.85, 0.96] },
   levant: { name: 'Levant', sub: 'maqam hijaz', insts: ['darbuka', 'oud', 'ney'], scale: 'hijaz', key: 2, bpm: [76, 128], prog: [0, 0, 3, 0], ink: [0.04, 0.5, 0.86] },
   caraibes: { name: 'Caraïbes', sub: 'Trinité', insts: ['congas', 'bass', 'steelpan'], scale: 'majeur', key: 0, bpm: [90, 128], prog: [0, 3, 4, 0], ink: [1, 0.93, 0.3] },
+  amlat: { name: 'Amérique latine', sub: 'Andes', insts: ['cajon', 'guitar', 'panflute'], scale: 'pentaMin', key: 4, bpm: [84, 128], ink: [0.08, 0.82, 0.86] },
+  chine: { name: 'Chine', sub: 'gamme gong', insts: ['tanggu', 'guzheng', 'erhu'], scale: 'pentaMaj', key: 2, bpm: [66, 112], prog: [0, 0, 3, 0], ink: [0.96, 0.15, 0.13] },
+  indonesie: { name: 'Indonésie', sub: 'gamelan, pelog', insts: ['kendang', 'gamelan', 'suling'], scale: 'pelog', key: 1, bpm: [80, 132], prog: [0, 0, 2, 0], ink: [0.56, 0.36, 0.98] },
+  irlande: { name: 'Irlande', sub: 'mode dorien', insts: ['bodhran', 'harp', 'whistle'], scale: 'dorien', key: 2, bpm: [96, 138], ink: [0.6, 0.88, 0.22] },
+  usa: { name: 'États-Unis', sub: 'blues', insts: ['brushes', 'rhodes', 'harmonica'], scale: 'blues', key: 4, bpm: [72, 120], ink: [1, 0.45, 0.62] },
+  maroc: { name: 'Maroc', sub: 'phrygien majeur', insts: ['bendir', 'guembri', 'ghaita'], scale: 'phrygienMaj', key: 2, bpm: [84, 132], prog: [0, 0, 1, 0], ink: [0.86, 0.7, 0.46] },
 };
 export const INSTRUMENTS = Object.fromEntries(Object.entries(INST).map(([k, v]) => [k, v.label]));
 
@@ -534,9 +622,12 @@ export const INSTRUMENTS = Object.fromEntries(Object.entries(INST).map(([k, v]) 
 function scheduleStep(s, t) {
   const d = state.drama, s16 = s % 16, sd = 60 / bpm / 4;
   const { iv, n, prog, base } = scaleInfo();
-  const climax = d.phase === 'climax', release = d.phase === 'release', tier = d.tier;
+  const pulse = pulseMode();
+  const climax = !pulse && d.phase === 'climax', release = !pulse && d.phase === 'release', tier = d.tier;
   let changed = false;
 
+  // Pulsation : le tempo rejoint celui du meneur, temps par temps, sans jamais sauter.
+  if (pulse && s16 % 4 === 0 && Math.abs(pulseBpm - bpm) > 2.5) bpm += clamp(pulseBpm - bpm, -7, 7);
   if (s16 === 0) {
     bar++;
     const every = climax ? 1 : tier >= 1 ? 2 : 4;
@@ -551,7 +642,7 @@ function scheduleStep(s, t) {
   if (gestMode()) return;
 
   // Battement de cœur : toujours là, même dans le calme.
-  if (state.m.energy > 0.03 && !d.attract && !d.hush && (s16 === 0 || (s16 === 3 && !chan.some((c) => c.on)))) drum(t, mtof(base), s16 ? 0.25 : 0.4, bus.pad, 0.2);
+  if (!pulse && state.m.energy > 0.03 && !d.attract && !d.hush && (s16 === 0 || (s16 === 3 && !chan.some((c) => c.on)))) drum(t, mtof(base), s16 ? 0.25 : 0.4, bus.pad, 0.2);
 
   if (d.hush || state.session.ended > 0) return;      // silence collectif, ou fin de session : seule la nappe reste
 
@@ -565,22 +656,26 @@ function scheduleStep(s, t) {
     const q = state.sec[i], coh = q.coherence;
     const e = climax ? Math.max(q.energy, 0.7) : q.energy;
     // Vitesse du secteur -> noires, croches ou doubles croches.
-    const lvl = release ? 0 : climax ? 2 : q.speed < 0.3 ? 0 : q.speed < 0.6 ? 1 : 2;
+    // Pulsation : la quantité de mouvement donne le nombre de notes (une sur deux temps, une par temps, croches,
+    // doubles croches) ; la percussion suit la même échelle. Sinon : la vitesse donne la subdivision.
+    const lvl = pulse ? (e < 0.3 ? 0 : e < 0.6 ? 1 : 2) : release ? 0 : climax ? 2 : q.speed < 0.3 ? 0 : q.speed < 0.6 ? 1 : 2;
     const grid = lvl === 0 ? s16 % 4 === 0 : lvl === 1 ? s16 % 2 === 0 : true;
     // Énergie -> nombre de notes ; cohérence -> régularité.
-    const hit = climax ? uni >= 0
+    const hit = pulse ? grid && (e >= 0.16 || s16 % 8 === 0)
+      : climax ? uni >= 0
       : grid && (s16 % 8 === 0 || Math.random() < 0.4 + 0.6 * e) && (s16 % 4 === 0 || Math.random() < 0.55 + 0.45 * coh);
     const x = {
-      t: climax ? t : t + Math.random() * (1 - coh) * 0.03, s16, sd, e, lvl, coh, r, n, iv, base, climax, uni, hit,
-      oct: clamp(Math.round((0.5 - q.cy) * 2.4), -1, 1),      // mouvement en haut du secteur -> aigu
+      t: climax || pulse ? t : t + Math.random() * (1 - coh) * 0.03, s16, sd, e, lvl, coh: pulse ? 1 : coh, r, n, iv, base, climax, uni, hit,
+      oct: pulse ? 0 : clamp(Math.round((0.5 - q.cy) * 2.4), -1, 1),      // mouvement en haut du secteur -> aigu
       d: c.in, c,
     };
+    if (pulse && q.gh) x.pd = Math.round(q.gh[q.gspeed[0] > q.gspeed[1] ? 0 : 1] * (2 * n - 1));      // la main la plus active choisit la note
     let played;
     if (c.accent) {
       c.accent = false; def.accent(x); played = true;
       queue.push({ t, accent: 1, x: (S[i].x + S[i].w / 2) / GW, y: (S[i].y + S[i].h / 2) / GH });
     } else played = def.play(x);
-    if (played) queue.push({ t, sec: i });
+    if (played) { queue.push({ t, sec: i }); state.music.sounds = (state.music.sounds || 0) + 1; }
   }
 }
 
@@ -594,6 +689,7 @@ function tick() {
   }
 }
 
+export const latency = () => (ac ? (ac.baseLatency || 0) + (ac.outputLatency || 0) : 0);
 export const debugInfo = () => ({ ctx: ac?.state, time: ac?.currentTime, step, bar, on: chan.map((c) => c.on), queued: queue.length });
 
 // Changement d'instrument à chaud : les notes déjà lancées s'éteignent d'elles-mêmes, la voix tenue du violon
@@ -612,7 +708,11 @@ function swapInst(c, s, now) {
 // La hauteur de la main choisit la note dans la gamme du pays ; la vivacité du geste donne la force. Rien n'est
 // tiré au hasard et rien ne sonne sans geste. Percussions = frappes, place de droite = chant, le reste = harmonie.
 export const gestMode = () => settings.play === 'gestes' && settings.mode === 'group';
-const SUSTAINED = { violin: 1, bansuri: 1, shakuhachi: 1, ney: 1, choir: 1 };
+// Jeu en pulsation : la percussion mène le tempo par la vitesse de ses gestes, les autres posent plus ou moins de
+// notes selon ce qu'ils bougent, et la hauteur de la main choisit la note.
+export const pulseMode = () => settings.play !== 'gestes' && settings.mode === 'group';
+export const SUSTAINED = { violin: 1, bansuri: 1, shakuhachi: 1, ney: 1, choir: 1, panflute: 1, suling: 1, whistle: 1, erhu: 1, ghaita: 1, harmonica: 1 };
+const BOW = { erhu: 1, ghaita: 1, harmonica: 1 };
 function gWhen(now) {
   const t0 = now + 0.004;
   if (!settings.snap) return t0;
@@ -623,6 +723,7 @@ function gTone(c, id, def, deg, v, len, t) {
   const { iv, n, base } = scaleInfo(), f = (oct) => mtof(deg2midi(deg, base + oct, iv)), d = c.in;
   if (id === 'piano') pianoNote(t, f(24), 0.55 * v, d, 0.3 + len * 0.6);
   else if (id === 'violin') violinNote(c, t, f(24), 0.3 * v, len);
+  else if (BOW[id]) violinNote(c, t, f(def.oct), 0.3 * v, len, id);
   else if (id === 'bass') bassNote(t, f(12), 0.9 * v, d, Math.min(0.5, len));
   else if (id === 'marimba') marimbaNote(t, f(24), 0.6 * v, d);
   else if (id === 'bells') bellNote(t, f(36), 0.4 * v, d, 0.3 + len * 0.5);
@@ -646,6 +747,11 @@ function playGesture(i, c, s, def, e, now) {
   const chant = i === 2 || sus, T = (dg, vv, len, tt) => gTone(c, id, def, dg, vv, len, tt), K = (lv, vv, tt) => gStroke(c, id, def, lv, vv, tt);
   const big = e.type === 'ouvrir' || e.type === 'lever' || e.type === 'sauter', trace = e.type === 'monter' || e.type === 'descendre' || e.type === 'balayer';
   if (trace && sus) return;      // violon et flûtes : la note tenue suit déjà la main
+  if (trace) {                   // budget : dix sons de mouvement par seconde et par personne, pour garder l'ordinateur fluide
+    c.gTok = Math.min(3, (c.gTok ?? 3) + (now - (c.gTokAt ?? now)) * 10); c.gTokAt = now;
+    if (c.gTok < 1) return;
+    c.gTok -= 1;
+  }
   if (def.perc) {
     const lv = h < 0.24 ? 0 : h < 0.5 ? 1 : 2;
     if (e.type === 'frapper') K(lv, v, t);
@@ -670,7 +776,7 @@ function playGesture(i, c, s, def, e, now) {
   else if (e.type === 'balayer') { if (!sus) { const d0 = deg - (e.hand ? 0 : n); T(d0, v * 0.9, 0.4, t); T(d0 + (e.dir > 0 ? 2 : -3), v * 0.7, 0.4, t + 0.012); } }
   else if (e.type === 'lever') { if (sus) T(2 * n - 1, 1, 1.5, t); else for (let k = 0; k < 6; k++) T(deg - 2 + k, 0.5 + 0.08 * k, k === 5 ? 1 : 0.2, t + k * 0.06); }
   else if (e.type === 'sauter') { if (chant) for (let k = 0; k < 6; k++) T(deg + k, 0.6 + 0.06 * k, k === 5 ? 0.8 : 0.15, t + k * 0.045); else [-n, 0, 2, 4, n].forEach((k, j) => T(deg + k, 0.8, 1, t + j * 0.008)); }
-  c.gAt = now; state.music.gestes = (state.music.gestes || 0) + 1;
+  c.gAt = now; state.music.gestes = (state.music.gestes || 0) + 1; state.music.sounds = (state.music.sounds || 0) + 1;
   if (!trace || now - (c.gVis || -9) > 0.12) { c.gVis = now; queue.push({ t, sec: i }); }
   if (big) queue.push({ t, accent: 1, x: (s.x + s.w / 2) / GW, y: (s.y + s.h / 2) / GH });
 }
@@ -690,7 +796,18 @@ function sustainGesture(i, c, s, def, q, now) {
 export function update(dt) {
   if (!ac) return;
   const now = ac.currentTime, m = state.m, d = state.drama, mu = state.music;
-  const climax = d.phase === 'climax', release = d.phase === 'release';
+  const pulse = pulseMode(), climax = !pulse && d.phase === 'climax', release = !pulse && d.phase === 'release';
+
+  // Pulsation : le meneur est la personne à la place du rythme (à gauche) ; si elle ne joue pas, c'est la moyenne
+  // de ceux qui bougent. Sa vitesse donne le tempo, de 60 à 150, avec une seconde d'inertie. Personne ne bouge :
+  // le tempo reste où il était, prêt à repartir.
+  if (pulse) {
+    const Q = state.sec, lead = Q[0].energy > 0.07 && INST[chan[0].inst]?.perc ? Q[0].speed : null;
+    let sp = lead, k = 0;
+    if (sp === null) { sp = 0; for (let i = 0; i < settings.sectors.length; i++) if (Q[i].energy > 0.07) { sp += Q[i].speed; k++; } sp = k ? sp / k : null; }
+    if (sp !== null) pulseBpm += (60 + 90 * clamp(sp) - pulseBpm) * Math.min(1, dt / 1);
+    dly.delayTime.setTargetAtTime(60 / bpm * 0.75, now, 0.3);
+  }
 
   // Tempo : vitesse de la foule, ou sa pulsation quand elle est nette. Variation progressive.
   const [lo, hi] = PRESETS[settings.preset]?.bpm || [70, 140];
@@ -698,8 +815,7 @@ export function update(dt) {
   if (m.pulseConf > 0.5 && m.energy > 0.12 && m.pulseBpm) target = m.pulseBpm;
   if (climax) target = Math.max(target, lo + 0.8 * (hi - lo));
   if (m.still) target = lo;
-  bpm += clamp(clamp(target, lo, hi) - bpm, -4 * dt, 4 * dt);
-  dly.delayTime.setTargetAtTime(60 / bpm * 0.75, now, 0.3);
+  if (!pulse) { bpm += clamp(clamp(target, lo, hi) - bpm, -4 * dt, 4 * dt); dly.delayTime.setTargetAtTime(60 / bpm * 0.75, now, 0.3); }
 
   // Secteurs : chacun ouvre son instrument selon sa propre énergie (seuil avec hystérésis).
   const ended = state.session.ended > 0, quiet = d.attract || m.still || d.hush || ended, S = settings.sectors, gest = gestMode();
@@ -738,13 +854,13 @@ export function update(dt) {
   pad.lfoGain.gain.setTargetAtTime(quiet ? 0.16 : 0.04, now, 1);          // la nappe respire au calme
   // Immobilité parfaite = silence complet : la nappe ne sonne que si quelqu'un bouge (ou tient les mains levées).
   const moving = Math.max(clamp((m.energy - 0.02) * 20), d.lift);
-  pad.level.gain.setTargetAtTime(gest ? 0.25 * d.lift : d.hush ? 0 : (quiet ? 0.3 : 0.1 + 0.25 * d.lift) * moving, now, d.hush ? 0.15 : moving < 0.05 ? 0.35 : 1.5);
+  pad.level.gain.setTargetAtTime(gest || pulse ? 0.25 * d.lift : d.hush ? 0 : (quiet ? 0.3 : 0.1 + 0.25 * d.lift) * moving, now, d.hush ? 0.15 : moving < 0.05 ? 0.35 : 1.5);
   master.gain.setTargetAtTime(settings.volume * 0.4, now, 0.15);      // marge : le limiteur reste une sécurité
 
   if (d.tierUps !== lastTierUps) {           // palier franchi : montée puis impact
     lastTierUps = d.tierUps;
     const dur = 60 / bpm * (climax ? 4 : 2);
-    if (!gest) riser(now, dur); impact(now + dur, 0.9); queue.push({ t: now + dur, accent: 1, x: 0.5, y: 0.5 });
+    if (!gest && !pulse) riser(now, dur); impact(now + dur, 0.9); queue.push({ t: now + dur, accent: 1, x: 0.5, y: 0.5 });
   }
 
   // Gestes collectifs. Mains en l'air ensemble : montée, puis grande frappe. Silence ensemble : la reprise claque.

@@ -84,7 +84,7 @@ export function init(canvas) {
 }
 
 function resize() {
-  const q = QUALITY[state.perf.quality], dpr = Math.min(devicePixelRatio || 1, 2);
+  const q = QUALITY[state.perf.quality], dpr = Math.min(devicePixelRatio || 1, 1.5);      // au-delà, le grain ne gagne rien et l'image coûte presque le double
   const w = Math.max(2, Math.round(cv.clientWidth * dpr * q.s)), h = Math.max(2, Math.round(cv.clientHeight * dpr * q.s));
   if (w === fw && h === fh) return;
   fw = w; fh = h; cv.width = w; cv.height = h;

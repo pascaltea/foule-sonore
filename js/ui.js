@@ -1,7 +1,7 @@
 // Régie : panneau de réglages, éditeur de secteurs, raccourcis clavier, jauge, affichage debug.
 import { GW, GH, GN, MAX_SECTORS, SECTOR_COLORS, ZONES, LAYOUTS, makeLayout, sanitizeSectors, rebuildSectorMap,
   state, settings, saveSettings, clamp, setMode, configOf, setConfig, sanitizePlayers, playersConfig, trio } from './state.js';
-import { SCALES, KEYS, INSTRUMENTS, PRESETS } from './music.js';
+import { SCALES, KEYS, INSTRUMENTS, PRESETS, latency } from './music.js';
 import { endSession, newSession } from './metrics.js';
 import { setNet, netInfo, regieUrl, setGallery, galleryInfo, galleryUrl, creatureUrl } from './remote.js';
 import { decode } from './portrait.js';
@@ -57,12 +57,13 @@ function sync() {
   $('mode').value = mk;
   document.querySelectorAll('[data-mode]').forEach((b) => b.classList.toggle('active', b.dataset.mode === mk));
   $('invite').firstElementChild.textContent = INVITE[mk][0]; $('invite').lastElementChild.textContent = INVITE[mk][1];
-  $('preset').value = settings.preset; $('sessionMin').value = settings.sessionMin; $('hintsOn').checked = settings.hints; $('playOn').checked = settings.play !== 'flux'; $('snapOn').checked = settings.snap;
+  $('preset').value = settings.preset; $('sessionMin').value = settings.sessionMin; $('hintsOn').checked = settings.hints; $('playSel').value = settings.play === 'gestes' ? 'gestes' : 'pulse'; $('snapOn').checked = settings.snap;
   $('galOn').checked = settings.onlineGallery;
   $('journeyOn').checked = settings.journey; document.body.classList.toggle('journey', settings.journey);
   document.querySelectorAll('[data-preset]').forEach((b) => b.classList.toggle('active', b.dataset.preset === settings.preset && !settings.custom));
   $('cfg').textContent = (PRESETS[settings.preset]?.name || '') + (settings.custom ? ' · libre' : '');
-  $('creatureOn').checked = settings.creature; $('gauge').style.display = settings.creature ? 'none' : '';
+  $('creatureMode').value = settings.creatureMode; $('recOn').checked = settings.record; $('perfOn').checked = settings.perfShown;
+  $('gauge').style.display = 'none'; $('perf').classList.toggle('on', settings.perfShown);
   document.querySelectorAll('[data-g]').forEach((b) => { b.dataset.c ??= b.textContent; b.textContent = group ? b.dataset.g : b.dataset.c; });
   $('showSec').checked = settings.showSectors;
   $('sectors').classList.toggle('on', settings.showSectors && mk !== 'trio');
@@ -172,7 +173,7 @@ function deleteSelected() {
 }
 
 // ---------- Export / import de la configuration ----------
-const CFG_KEYS = ['journey', 'sensitivity', 'scale', 'key', 'volume', 'palette', 'dramaSpeed', 'showSectors', 'zones', 'creature', 'preset', 'custom', 'sessionMin', 'hints', 'play', 'snap'];
+const CFG_KEYS = ['journey', 'sensitivity', 'scale', 'key', 'volume', 'palette', 'dramaSpeed', 'showSectors', 'zones', 'creature', 'preset', 'custom', 'sessionMin', 'hints', 'play', 'snap', 'creatureMode', 'record'];
 function exportConfig() {
   const cfg = { type: 'foule-sonore', version: 4, sectors: configOf('crowd'), players: playersConfig() };
   CFG_KEYS.forEach((k) => { cfg[k] = settings[k]; });
@@ -195,6 +196,8 @@ export function applyConfig(cfg) {
   settings.showSectors = !!cfg.showSectors;
   if ('zones' in cfg) settings.zones = !!cfg.zones;
   if ('creature' in cfg) settings.creature = !!cfg.creature;
+  if (['visible', 'fin', 'aucune'].includes(cfg.creatureMode)) settings.creatureMode = cfg.creatureMode;
+  if ('record' in cfg) settings.record = !!cfg.record;
   if (PRESETS[cfg.preset]) settings.preset = cfg.preset;
   if ('custom' in cfg) settings.custom = !!cfg.custom;
   if (cfg.sessionMin >= 0) settings.sessionMin = clamp(+cfg.sessionMin, 0, 30);
@@ -263,7 +266,7 @@ export function remoteState() {
     gauge: +d.gauge.toFixed(3), phase: d.phase, attract: d.attract, hush: d.hush, lift: +d.lift.toFixed(2), bpm: Math.round(state.music.bpm),
     session: { on: ss.on, t: Math.floor(ss.t), ended: ss.ended > 0 },
     stops: state.journey.bands.map((b) => PRESETS[b.id]?.name).filter(Boolean), creatures: gallery.n, overflows: state.journey.overflows,
-    set: { journey: settings.journey, volume: settings.volume, sensitivity: settings.sensitivity, dramaSpeed: settings.dramaSpeed, sessionMin: settings.sessionMin, scale: settings.scale, key: settings.key, hints: settings.hints, play: settings.play, snap: settings.snap, simulate: settings.simulate },
+    set: { journey: settings.journey, volume: settings.volume, sensitivity: settings.sensitivity, dramaSpeed: settings.dramaSpeed, sessionMin: settings.sessionMin, scale: settings.scale, key: settings.key, hints: settings.hints, play: settings.play, snap: settings.snap, creatureMode: settings.creatureMode, simulate: settings.simulate },
   };
 }
 export function remoteApply(m) {
@@ -275,7 +278,8 @@ export function remoteApply(m) {
   else if (m.type === 'set' && REMOTE_SET[m.key]) { const [a, b] = REMOTE_SET[m.key]; settings[m.key] = m.key === 'key' ? Math.round(clamp(+m.value, a, b)) : clamp(+m.value, a, b); syncInputs(); sync(); }
   else if (m.type === 'set' && m.key === 'scale' && SCALES[m.value]) { settings.scale = m.value; syncInputs(); sync(); }
   else if (m.type === 'set' && m.key === 'hints') { settings.hints = !!m.value; sync(); }
-  else if (m.type === 'set' && m.key === 'play') { settings.play = m.value === 'flux' ? 'flux' : 'gestes'; syncInputs(); sync(); }
+  else if (m.type === 'set' && m.key === 'play') { settings.play = m.value === 'gestes' ? 'gestes' : 'pulse'; syncInputs(); sync(); }
+  else if (m.type === 'set' && m.key === 'creatureMode' && ['visible', 'fin', 'aucune'].includes(m.value)) { settings.creatureMode = m.value; syncInputs(); sync(); }
   else if (m.type === 'set' && m.key === 'snap') { settings.snap = !!m.value; syncInputs(); sync(); }
   else if (m.type === 'set' && m.key === 'journey') { settings.journey = !!m.value; sync(); }
   else if (m.type === 'cmd' && m.name === 'next') nextStop();
@@ -314,7 +318,10 @@ export function init(h) {
   $('preset').onchange = (e) => applyPreset(e.target.value);
   $('sessionMin').onchange = (e) => { settings.sessionMin = +e.target.value; sync(); };
   $('hintsOn').onchange = (e) => { settings.hints = e.target.checked; sync(); };
-  $('playOn').onchange = (e) => { settings.play = e.target.checked ? 'gestes' : 'flux'; sync(); };
+  $('playSel').onchange = (e) => { settings.play = e.target.value; sync(); };
+  $('creatureMode').onchange = (e) => { settings.creatureMode = e.target.value; sync(); };
+  $('recOn').onchange = (e) => { settings.record = e.target.checked; sync(); };
+  $('perfOn').onchange = (e) => { settings.perfShown = e.target.checked; sync(); };
   $('snapOn').onchange = (e) => { settings.snap = e.target.checked; sync(); };
   $('recExport').onclick = async () => { const n = await record.exportAll(); note(n ? `${n} morceau${n > 1 ? 'x' : ''} téléchargé${n > 1 ? 's' : ''}.` : 'Aucun morceau enregistré pour l\'instant.', 4000); };
   $('sessNew').onclick = newSession; $('sessEnd').onclick = endSession; $('openRegie').onclick = openRegie;
@@ -352,7 +359,6 @@ export function init(h) {
   $('dbgOn').onchange = (e) => { settings.debug = e.target.checked; sync(); };
   $('sim').onchange = (e) => setSim(e.target.checked);
   $('showSec').onchange = (e) => { settings.showSectors = e.target.checked; sync(); };
-  $('creatureOn').onchange = (e) => { settings.creature = e.target.checked; sync(); };
   $('layout').onchange = (e) => { if (e.target.value) { settings.sectors = makeLayout(e.target.value, settings.sectors); sel = -1; sectorsChanged(); } };
   $('secList').addEventListener('input', onSectorInput);
   $('secList').addEventListener('click', onSectorInput);
@@ -383,6 +389,8 @@ export function init(h) {
     else if (k === 'r') capture.recalibrate();
     else if (k >= '0' && k <= '7') { settings.simPreset = +k; sync(); }
     else if (k === 'g') openRegie();
+    else if (k === 'p') { settings.perfShown = !settings.perfShown; sync(); }
+    else if (k === 'm') { settings.creatureMode = { fin: 'visible', visible: 'aucune', aucune: 'fin' }[settings.creatureMode] || 'fin'; note({ fin: 'Créature : révélée à la fin', visible: 'Créature : visible pendant le jeu', aucune: 'Créature : aucune' }[settings.creatureMode], 2500); sync(); }
     else if (k === ' ') { e.preventDefault(); capture.simJump(); }
     else if ((k === 'delete' || k === 'backspace') && settings.debug) deleteSelected();
   });
@@ -499,6 +507,7 @@ function updateHints(now) {
     // Son lien tient tout entier dans ce code QR : chacun repart avec sa créature.
     if (last.code) { $('takeQr').innerHTML = ''; qr($('takeQr'), creatureUrl(last.code)); }
   }
+  if (ss.ended > 0 && !last && endShown !== 'aucune') { endShown = 'aucune'; $('end').innerHTML = '<b>Merci</b><small>Place aux suivants</small>'; }      // sans créature
   if (galleryShown !== gallery.version) {
     galleryShown = gallery.version;
     const items = gallery.items.slice(-24).map((it) => ({ ...it, ...(it.code ? decode(it.code) : null) }));
@@ -522,8 +531,17 @@ function updateHints(now) {
   }
 }
 
+let perfAt = 0, perfSounds = 0, perfRate = 0;
+function updatePerf(now) {
+  if (!settings.perfShown || now - perfAt < 500) return;
+  const P = state.perf, snd = state.music.sounds || 0, lat = latency() * 1000;
+  perfRate = (snd - perfSounds) / ((now - perfAt) / 1000); perfSounds = snd; perfAt = now;
+  const cam = P.poseFps > 1 ? 1000 / P.poseFps : 33, delay = cam * 1.5 + P.poseMs + lat;
+  $('perf').textContent = `rendu   ${P.fps.toFixed(0).padStart(3)} img/s   qualité ${P.quality + 1}/3\nsuivi   ${P.poseFps.toFixed(0).padStart(3)} img/s   ${P.poseMs.toFixed(0)} ms par image   ${P.people} pers.\nson     ${perfRate.toFixed(0).padStart(3)} sons/s   sortie ${lat.toFixed(0)} ms\ngeste → son  environ ${delay.toFixed(0)} ms`;
+}
 export function update() {
   const d = state.drama, m = state.m, c = state.capture;
+  updatePerf(performance.now());
   updateHints(performance.now());
   hE[hp] = m.energy; hS[hp] = m.speed; hC[hp] = m.coherence; hG[hp] = d.gauge; hp = (hp + 1) % HL;
   $('gaugeFill').style.width = (d.gauge * 100).toFixed(1) + '%';

@@ -64,13 +64,16 @@ export function sanitizePlayers(arr) {
 export const settings = Object.assign({
   mode: 'group',      // 'crowd' (foule, secteurs fixes) ou 'group' (personnes suivies)
   zones: true,        // en 'group' : scène à trois, l'instrument dépend de la place (gauche, centre, droite)
-  creature: true,     // le dôme incarne la jauge collective
+  creature: true,     // (ancien réglage, remplacé par creatureMode)
+  creatureMode: 'fin', // 'visible' : la créature se forme pendant le jeu ; 'fin' : calculée en silence, révélée à la fin ; 'aucune'
+  record: true,       // enregistre le morceau de chaque session sur cet ordinateur
+  perfShown: false,   // affichage des performances (touche P)
   preset: 'geneve',   // configuration d'instruments (voir PRESETS dans music.js)
   custom: false,      // un instrument a été changé à la main depuis le choix de la configuration
   sessionMin: 5,      // durée d'une session en minutes ; 0 = libre
   hints: false,       // consignes de jeu affichées au public (masquées par défaut, à activer dans les réglages ou la régie)
   rev: 7,
-  play: 'gestes',     // 'gestes' : chaque geste joue un son (un instrument) ; 'flux' : l'ancienne partition guidée par le mouvement
+  play: 'gestes',     // 'gestes' : chaque geste joue un son ; 'pulse' : jeu en pulsation (la percussion mène le tempo)
   snap: false,        // jeu par gestes : cale chaque son sur une pulsation commune (secours si trois débutants se dispersent)
   gestesOff: ['pousser'],   // gestes reconnus mais pas joués en scène (la profondeur est mal perçue par une seule caméra)
   journey: true,      // voyage aller-retour depuis Genève : les gestes collectifs font changer d'escale
@@ -140,7 +143,7 @@ export const state = {
     running: false, bpm: 90, beatPulse: 0, beatCount: 0, accent: 0, accentCount: 0, accentX: 0.5, accentY: 0.5,
     chord: 0, level: 0,
   },
-  perf: { fps: 60, quality: 2 },
+  perf: { fps: 60, quality: 2, poseFps: 0, poseMs: 0, people: 0 },
 };
 
 // À appeler après toute modification des secteurs. En cas de recouvrement, le premier de la liste l'emporte.

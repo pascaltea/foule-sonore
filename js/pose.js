@@ -19,7 +19,9 @@ export const slots = Array.from({ length: MAX_PLAYERS }, () => ({
   pid: 0, tE: 0, tS: 0, tC: 0, tCy: 0.5, tOpen: 0.5, up: false, jumpAge: 9,
   g: new Gestes(ASPECT, true), ev: [],
 }));
-let landmarker = null, loading = null, lastVT = -1;
+let landmarker = null, loading = null, lastVT = -1, wanted = 0, poseN = 0, poseAt = 0;
+// Scène à trois : on ne cherche que trois corps, c'est le poste le plus lourd de tout le suivi.
+const wantedPoses = () => (trio() ? ZONES : MAX_PLAYERS);
 
 // Charge la bibliothèque et le modèle (quelques Mo, mis en cache par le navigateur ensuite).
 export function load() {
@@ -29,7 +31,7 @@ export function load() {
       const { PoseLandmarker, FilesetResolver } = await import(`${CDN}/vision_bundle.mjs`);
       const files = await FilesetResolver.forVisionTasks(`${CDN}/wasm`);
       const opt = (delegate) => ({
-        baseOptions: { modelAssetPath: MODEL, delegate }, runningMode: 'VIDEO', numPoses: MAX_PLAYERS,
+        baseOptions: { modelAssetPath: MODEL, delegate }, runningMode: 'VIDEO', numPoses: (wanted = wantedPoses()),
         minPoseDetectionConfidence: 0.5, minPosePresenceConfidence: 0.5, minTrackingConfidence: 0.5,
       });
       try { landmarker = await PoseLandmarker.createFromOptions(files, opt('GPU')); }
@@ -197,7 +199,12 @@ export function update(dt) {
     const dtV = clamp(video.currentTime - lastVT, 1 / 60, 0.2);
     lastVT = video.currentTime;
     let res = null;
-    try { res = landmarker.detectForVideo(video, performance.now()); } catch { /* image ignorée */ }
+    if (wanted !== wantedPoses()) { wanted = wantedPoses(); try { landmarker.setOptions({ numPoses: wanted }); } catch { /* réglage ignoré */ } }
+    const t0 = performance.now();
+    try { res = landmarker.detectForVideo(video, t0); } catch { /* image ignorée */ }
+    const P = state.perf, t1 = performance.now();
+    P.poseMs += (t1 - t0 - P.poseMs) * 0.1; poseN++;
+    if (t1 - poseAt > 1000) { P.poseFps = poseN * 1000 / (t1 - poseAt); poseN = 0; poseAt = t1; }
     if (res) ingest(res.landmarks.map((l) => l.map((q) => ({ x: 1 - q.x, y: q.y, visibility: q.visibility ?? 1 }))), dtV);
   } else if (!landmarker || state.capture.mode !== 'camera') ingest([], dt);
 
@@ -231,6 +238,7 @@ export function update(dt) {
     r.w = clamp(Math.ceil((x1 + 0.03) * GW) - gx0, 2, GW - gx0); r.h = clamp(Math.ceil((y1 + 0.04) * GH) - gy0, 2, GH - gy0);
     if (sim) for (const [k] of MOVERS) splat(s.px[k] * GW, s.py[k] * GH, s.vx[k] * GW, s.vy[k] * GH, 2.2);
   }
+  state.perf.people = slots.filter((s) => s.on).length;
   rebuildSectorMap();
 }
 let simT = 0;

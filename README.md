@@ -135,3 +135,18 @@ C'est le mouvement des bras qui joue, pas seulement la position d'arrivée : des
 ## Le morceau de chaque session
 
 Le son produit par l'ordinateur (jamais la salle) est enregistré pendant chaque session et gardé dans le navigateur de l'ordinateur de scène, sous le numéro de la créature. Après la soirée : réglages, « Exporter les morceaux », puis déposer les fichiers dans `morceaux/` à la racine du dépôt (`morceaux/12.webm` pour la créature n° 12). La page de la créature affiche alors un lecteur.
+
+## Deux façons de jouer (réglages `H` ou régie)
+
+- **Par gestes** (par défaut) : un geste, un son, voir plus haut. Option « Calage sur une pulsation ».
+- **En pulsation** : la personne à la place du rythme (à gauche) mène le tempo par la vitesse de ses gestes, de 60 à 150 battements par minute, avec une seconde d'inertie. Les autres posent plus ou moins de notes selon la quantité de mouvement (une note tous les deux temps, une par temps, croches, doubles croches) et la hauteur de la main choisit la note. Si personne ne tient le rythme, le tempo suit la moyenne de ceux qui bougent. Immobilité : silence.
+
+## Douze pays
+
+Genève, Mali, Inde, Japon, Levant, Caraïbes, Amérique latine (cajón, guitare, flûte de pan), Chine (tanggu, guzheng, erhu), Indonésie (kendang, gamelan, suling, gamme pelog), Irlande (bodhrán, harpe, tin whistle, mode dorien), États-Unis (batterie aux balais, piano électrique, harmonica, gamme blues), Maroc (bendir et qraqeb, guembri, ghaïta, phrygien majeur). Chaque pays applique sa gamme et sa tonalité, à l'écran d'accueil, depuis la régie comme pendant le voyage. Le voyage traverse toujours trois pays, tirés à tour de rôle parmi les onze.
+
+## Fluidité
+
+- **Créature** (touche `M`) : « révélée à la fin » par défaut. Elle se calcule sans être dessinée pendant le jeu et apparaît à la fin avec son code QR. « Visible » la dessine pendant le jeu ; « aucune » supprime créature, code QR et entrée de galerie.
+- **Performances** (touche `P`) : images par seconde du rendu et du suivi du corps, temps de suivi par image, sons par seconde, délai estimé entre geste et son.
+- En scène à trois, le suivi ne cherche que trois corps. Le mouvement des bras ne déclenche pas plus de dix sons par seconde et par personne.

@@ -94,8 +94,8 @@ export class Gestes {
       if (H.row === undefined) { H.row = row; H.col = col; }
       if (spd > 0.7 && !this.block && !H.gap) {
         const two = other > 1.2, v = clamp(0.2 + spd / 11, 0.2, 0.85);
-        if (row !== H.row && Math.abs(vy) >= Math.abs(vx) * 0.7) { ev.push({ type: row > H.row ? 'monter' : 'descendre', hand: i, two, v, h: c.h[i] }); H.gap = 0.085; }
-        else if (col !== H.col && Math.abs(vx) > Math.abs(vy) * 0.7) { ev.push({ type: 'balayer', hand: i, two, dir: (vx < 0 ? 1 : -1) * this.M, v, h: c.h[i] }); H.gap = 0.085; }
+        if (row !== H.row && Math.abs(vy) >= Math.abs(vx) * 0.7) { ev.push({ type: row > H.row ? 'monter' : 'descendre', hand: i, two, v, h: c.h[i] }); H.gap = 0.1; }
+        else if (col !== H.col && Math.abs(vx) > Math.abs(vy) * 0.7) { ev.push({ type: 'balayer', hand: i, two, dir: (vx < 0 ? 1 : -1) * this.M, v, h: c.h[i] }); H.gap = 0.1; }
       }
       if (!H.gap || spd <= 0.7) { H.row = row; H.col = col; }
     }
