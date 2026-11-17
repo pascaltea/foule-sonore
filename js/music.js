@@ -42,7 +42,7 @@ export async function init() {
   if (ac) { await ac.resume(); return; }
   ac = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
   await ac.resume();
-  build();
+  build(); loadPiano();
   nextT = ac.currentTime + 0.15;
   setInterval(tick, 25);
   state.music.running = true;
@@ -51,12 +51,13 @@ export async function init() {
 // Atelier des gestes (atelier.html) : le même moteur de sons, sans la partition automatique. La scène ne s'en sert pas.
 export async function initLab() {
   if (!ac) { ac = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' }); build(); }
-  await ac.resume();
+  await ac.resume(); await loadPiano();
   pad.level.gain.value = 0; pad.lfoGain.gain.value = 0; master.gain.value = 0.4;
   // Les mêmes fonctions que la scène : ce qu'on entend dans l'atelier est ce qu'on entendra sur scène.
   const sec = { x: 0, y: 0, w: 0, h: 0 };
   return {
     ac, chan, INST, PRESETS, SCALES, mtof, deg2midi,
+    pianoSamples(on) { pianoSamples = on; return PIANO.filter((p) => p.buf).length; },
     gesture(place, inst, e) { const c = chan[place]; playGesture(place, c, sec, INST[inst], e, ac.currentTime); queue.length = 0; },
     sustain(place, inst, q) { sustainGesture(place, chan[place], sec, INST[inst], q, ac.currentTime); queue.length = 0; },
     use(place, inst) { const c = chan[place], def = INST[inst], now = ac.currentTime; swapInst(c, { inst }, now); chan.forEach((k) => k.level.gain.setTargetAtTime(k === c ? def.level : 0, now, 0.04)); c.rv.gain.setTargetAtTime(def.rev * 1.2, now, 0.1); c.dl.gain.setTargetAtTime(def.dly, now, 0.1); c.filt.frequency.setTargetAtTime(16000, now, 0.05); },
@@ -210,7 +211,28 @@ function bellNote(t, f, vol, dest, long = 0.5) {
   voice({ f: f * 5.4, t, dur: 0.005, vol: vol * 0.12, dest, a: 0.001, r: long * 0.2 });
 }
 // Piano : marteau (bruit bref), cordes légèrement désaccordées, timbre qui s'assombrit en résonnant.
+// Le piano de Genève : de vraies notes, isolées de l'enregistrement « Paris » fourni par Pascal (samples/). Chaque
+// note jouée part de l'échantillon le plus proche, transposé. Tant que les fichiers ne sont pas chargés (ou s'ils
+// manquent), le piano de synthèse prend le relais.
+const PIANO = [['sol2', 97.7], ['do4', 261.46], ['sol4', 391.93]].map(([n, f]) => ({ url: `samples/piano-${n}.wav`, f, buf: null }));
+const PIANO_GAIN = 1.2;
+let pianoSamples = true;
+async function loadPiano() {
+  await Promise.all(PIANO.map(async (p) => {
+    if (p.buf) return;
+    try { p.buf = await ac.decodeAudioData(await (await fetch(new URL(`../${p.url}`, import.meta.url))).arrayBuffer()); } catch { /* fichier absent : piano de synthèse */ }
+  }));
+}
 function pianoNote(t, f, vol, dest, long = 0.45) {
+  let best = null, bd = 9;
+  if (pianoSamples) for (const p of PIANO) { const d = Math.abs(Math.log2(f / p.f)); if (p.buf && d < bd) { bd = d; best = p; } }
+  if (best) {
+    const src = ac.createBufferSource(), g = ac.createGain(), hold = 0.35 + long * 1.6;
+    src.buffer = best.buf; src.playbackRate.value = f / best.f;
+    g.gain.setValueAtTime(vol * PIANO_GAIN, t); g.gain.setTargetAtTime(0, t + hold, 0.18 + long * 0.5);      // la note résonne, puis l'étouffoir retombe
+    src.connect(g); g.connect(dest); src.start(t); src.stop(t + hold + 2.5 + long * 2);
+    return;
+  }
   const decay = long * clamp(330 / f, 0.5, 1.6) ** 0.5;
   for (const det of [-5, 4]) {
     voice({ type: 'sawtooth', f, t, dur: 0.015, vol: vol * 0.3, dest, a: 0.003, r: decay, cutoff: f * 7, cutTo: f * 1.6, cutT: 0.35, det });
